@@ -295,7 +295,37 @@ BEGIN
         name   => 'COMPRESSION',
         value  => '${compression}'
     );
+
+    -- Supporto Restartability
+    DBMS_DATAPUMP.SET_PARAMETER(
+        handle => v_handle,
+        name   => 'KEEP_MASTER',
+        value  => 1
+    );
 """
+
+    // Data Masking
+    if (options.maskingRules) {
+        options.maskingRules.split(',').each { rule ->
+            def ruleParts = rule.split(':')
+            if (ruleParts.length == 2) {
+                def colParts = ruleParts[0].split('\\.')
+                if (colParts.length == 3) {
+                    plsqlBlock += """
+    -- Data Masking
+    DBMS_DATAPUMP.DATA_REMAP(
+        handle       => v_handle,
+        name         => 'COLUMN_FUNCTION',
+        table_name   => '${colParts[1]}',
+        column       => '${colParts[2]}',
+        function     => '${ruleParts[1]}',
+        schema_name  => '${colParts[0]}'
+    );
+"""
+                }
+            }
+        }
+    }
 
     // Esclusione statistiche se richiesto
     if (options.includeStatistics == false) {
@@ -465,6 +495,38 @@ BEGIN
         degree => ${parallel}
     );
 
+    -- Supporto Restartability
+    DBMS_DATAPUMP.SET_PARAMETER(
+        handle => v_handle,
+        name   => 'KEEP_MASTER',
+        value  => 1
+    );
+"""
+
+    // Data Masking per Import
+    if (options.maskingRules) {
+        options.maskingRules.split(',').each { rule ->
+            def ruleParts = rule.split(':')
+            if (ruleParts.length == 2) {
+                def colParts = ruleParts[0].split('\\.')
+                if (colParts.length == 3) {
+                    plsqlBlock += """
+    -- Data Masking
+    DBMS_DATAPUMP.DATA_REMAP(
+        handle       => v_handle,
+        name         => 'COLUMN_FUNCTION',
+        table_name   => '${colParts[1]}',
+        column       => '${colParts[2]}',
+        function     => '${ruleParts[1]}',
+        schema_name  => '${colParts[0]}'
+    );
+"""
+                }
+            }
+        }
+    }
+
+    plsqlBlock += """
     -- Avvio job di import
     DBMS_DATAPUMP.START_JOB(handle => v_handle);
 
@@ -698,6 +760,14 @@ def buildExpdpCommand(Map dbConfig, String schema, Map options) {
         cmd.append(" ENCRYPTION_ALGORITHM=AES256")
     }
 
+    // Data Masking
+    if (options.maskingRules) {
+        cmd.append(" REMAP_DATA=${options.maskingRules}")
+    }
+    
+    // Restartability
+    cmd.append(" KEEP_MASTER=Y")
+
     echo "[DataPump/CLI] Comando expdp costruito (credenziali mascherate)"
     return cmd.toString()
 }
@@ -763,6 +833,14 @@ def buildImpdpCommand(Map dbConfig, String schema, Map options) {
     if (options.includeStatistics == false) {
         cmd.append(" EXCLUDE=STATISTICS")
     }
+
+    // Data Masking
+    if (options.maskingRules) {
+        cmd.append(" REMAP_DATA=${options.maskingRules}")
+    }
+    
+    // Restartability
+    cmd.append(" KEEP_MASTER=Y")
 
     echo "[DataPump/CLI] Comando impdp costruito (credenziali mascherate)"
     return cmd.toString()

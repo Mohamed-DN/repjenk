@@ -185,6 +185,17 @@ pipeline {
 
         // --- Sicurezza e conferma ---
         booleanParam(
+            name: 'ENABLE_DATA_MASKING',
+            defaultValue: false,
+            description: 'Attiva Data Masking (REMAP_DATA) per oscuramento dati sensibili in DEV/UAT.'
+        )
+        string(
+            name: 'MASKING_RULES',
+            defaultValue: '',
+            trim: true,
+            description: 'Regole di masking. Es: HR.USERS.EMAIL:ENI_DATA_MASKING.MASK_EMAIL'
+        )
+        booleanParam(
             name: 'CONFIRM_DESTRUCTIVE',
             defaultValue: false,
             description: 'OBBLIGATORIO per operazioni distruttive su ambienti PROD. Conferma esplicita.'
@@ -209,6 +220,12 @@ pipeline {
             defaultValue: '',
             trim: true,
             description: 'Nome del bucket OCI Object Storage per upload/download dump.'
+        )
+        string(
+            name: 'RETENTION_DAYS',
+            defaultValue: '30',
+            trim: true,
+            description: 'Giorni di retention per i dump file. I dump più vecchi verranno eliminati.'
         )
 
         // --- Filtri avanzati ---
@@ -1200,6 +1217,26 @@ e lo schema nuovo prenderà il nome di produzione.""",
             }
         }
 
+        // =====================================================================
+        // STAGE 10: CLEANUP OBJECT STORAGE
+        // =====================================================================
+        stage('Cleanup Object Storage') {
+            when {
+                expression { params.BUCKET_NAME?.trim() && !params.DRY_RUN }
+            }
+            steps {
+                script {
+                    echo "\u001B[36m[INFO] Avvio pulizia Object Storage (Retention: ${params.RETENTION_DAYS} giorni)...\u001B[0m"
+                    try {
+                        def ns = ociStorage.getNamespace()
+                        ociStorage.cleanupOldDumps(ns, params.BUCKET_NAME, '', params.RETENTION_DAYS as int)
+                    } catch (Exception e) {
+                        echo "\u001B[33m[ATTENZIONE] Pulizia bucket fallita: ${e.message}\u001B[0m"
+                    }
+                }
+            }
+        }
+
     } // fine stages
 
     // =========================================================================
@@ -1218,6 +1255,15 @@ e lo schema nuovo prenderà il nome di produzione.""",
                 if (env.REPORT_FILE) {
                     archiveArtifacts artifacts: "${REPORT_DIR}/*.html", allowEmptyArchive: true
                 }
+
+                // --- Generazione Audit JSON per Splunk/ELK ---
+                notifyResult.generateAuditJSON([
+                    operation: params.OPERATION,
+                    schema: params.SCHEMA_NAME,
+                    status: currentBuild.currentResult,
+                    durationMs: currentBuild.duration
+                ], REPORT_DIR)
+                archiveArtifacts artifacts: "${REPORT_DIR}/*.json", allowEmptyArchive: true
 
                 // --- Log riepilogativo finale ---
                 def finalStatus = currentBuild.currentResult ?: 'UNKNOWN'

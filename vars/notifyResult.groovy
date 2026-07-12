@@ -535,3 +535,34 @@ private String buildOptionsTable(Map options) {
     html += "            </table>\n"
     return html
 }
+
+// --------------------------------------------------------------------------
+// Generazione file JSON strutturato per ingestion in ELK/Splunk
+// --------------------------------------------------------------------------
+def generateAuditJSON(Map operationDetails, String reportDir) {
+    echo "[Notify/Audit] ➤ Generazione Audit JSON per Splunk/ELK..."
+    
+    def auditData = [
+        timestamp   : new Date().format("yyyy-MM-dd'T'HH:mm:ss'Z'", TimeZone.getTimeZone("UTC")),
+        operation   : operationDetails.operation ?: 'UNKNOWN',
+        schema      : operationDetails.schema ?: 'N/A',
+        status      : operationDetails.status ?: 'UNKNOWN',
+        duration_ms : operationDetails.durationMs ?: 0,
+        source_db   : env.SOURCE_DB ?: 'N/A',
+        target_db   : env.TARGET_DB ?: 'N/A',
+        build_number: env.BUILD_NUMBER,
+        job_name    : env.JOB_NAME,
+        user        : env.BUILD_USER ?: 'Jenkins',
+        discrepancies: env.VERIFICATION_DISCREPANCIES ?: 0
+    ]
+    
+    def jsonString = groovy.json.JsonOutput.toJson(auditData)
+    def filename = "${reportDir}/audit_${env.BUILD_NUMBER}_${System.currentTimeMillis()}.json"
+    
+    try {
+        writeFile(file: filename, text: jsonString)
+        echo "[Notify/Audit] ✔ File Audit JSON creato: ${filename}"
+    } catch (Exception e) {
+        echo "[Notify/Audit] ⚠ Errore creazione file JSON: ${e.message}"
+    }
+}
