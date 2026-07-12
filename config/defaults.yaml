@@ -1,0 +1,296 @@
+# =============================================================================
+# ENI Oracle Data Pump Pipeline — Configurazione Predefinita
+# Progetto: ENI Oracle Data Pump Automation Pipeline
+#
+# Questo file definisce i valori predefiniti per tutte le operazioni della
+# pipeline. I valori possono essere sovrascritti a livello di singolo database
+# (databases.yaml) o tramite parametri Jenkins.
+#
+# Ordine di precedenza (dal più alto al più basso):
+#   1. Parametri Jenkins (runtime)
+#   2. Configurazione database (databases.yaml)
+#   3. Valori predefiniti (questo file)
+# =============================================================================
+
+# ---------------------------------------------------------------------------
+# Pipeline — Comportamento generale della pipeline Jenkins
+# ---------------------------------------------------------------------------
+pipeline:
+  # Timeout massimo per l'intera pipeline (in ore)
+  timeout_hours: 8
+  # Intervallo di polling per operazioni asincrone (secondi)
+  poll_interval_seconds: 30
+  # Numero massimo tentativi per operazioni fallibili
+  max_retries: 3
+  # Ritardo tra i tentativi (secondi) — con backoff esponenziale
+  retry_delay_seconds: 60
+  # Numero massimo di pipeline concorrenti per stesso database
+  max_concurrent_per_db: 1
+  # Workspace cleanup dopo il completamento
+  cleanup_workspace: true
+  # Abilita metriche di performance
+  collect_metrics: true
+  # Label del nodo Jenkins per l'esecuzione
+  agent_label: "oracle-dba"
+  # Stash dei log per archiviazione
+  archive_logs: true
+
+# ---------------------------------------------------------------------------
+# Export — Configurazione predefinita per Oracle Data Pump Export
+# ---------------------------------------------------------------------------
+export:
+  # Grado di parallelismo
+  parallel: 4
+  # Compressione del dump (NONE | BASIC | ALL)
+  # BASIC: solo metadati; ALL: dati + metadati (richiede licenza Advanced Compression)
+  compression: "BASIC"
+  # Cifratura del dump (NONE | ALL | DATA_ONLY | ENCRYPTED_COLUMNS_ONLY)
+  encryption: "NONE"
+  # Algoritmo cifratura (AES128 | AES192 | AES256)
+  encryption_algorithm: "AES256"
+  # Contenuto export (ALL | DATA_ONLY | METADATA_ONLY)
+  content: "ALL"
+  # Includere privilegi (GRANT)
+  include_grants: true
+  # Includere statistiche dell'ottimizzatore
+  include_statistics: true
+  # Utilizzare FLASHBACK_TIME per consistenza point-in-time
+  flashback_time: false
+  # Export consistente (richiede FLASHBACK_TIME o FLASHBACK_SCN)
+  consistent: true
+  # Timeout specifico per export (secondi) — 0 = usa pipeline.timeout_hours
+  timeout_seconds: 0
+  # Metriche di performance nel log
+  metrics: true
+  # Riutilizza file dump esistenti
+  reuse_dumpfiles: true
+  # Dimensione massima stimata per il dump di default (GB)
+  estimate_size_method: "BLOCKS"
+  # Numero massimo file dump (per export paralleli con %U)
+  max_dump_files: 10
+
+# ---------------------------------------------------------------------------
+# Import — Configurazione predefinita per Oracle Data Pump Import
+# ---------------------------------------------------------------------------
+import:
+  # Grado di parallelismo
+  parallel: 4
+  # Azione per tabelle già esistenti (SKIP | REPLACE | APPEND | TRUNCATE)
+  # SKIP:     salta la tabella se esiste
+  # REPLACE:  drop + recreate
+  # APPEND:   aggiunge righe alla tabella esistente
+  # TRUNCATE: svuota e reinserisce
+  table_exists_action: "SKIP"
+  # Contenuto import (ALL | DATA_ONLY | METADATA_ONLY)
+  content: "ALL"
+  # Includere privilegi (GRANT)
+  include_grants: true
+  # Disabilita attributi di segmento (utile per import cross-environment)
+  transform_segment_attributes: false
+  # Disabilita OID per tipi oggetto (evita conflitti cross-schema)
+  transform_oid: false
+  # Disabilita constraint durante import per performance
+  transform_constraints: false
+  # Timeout specifico per import (secondi) — 0 = usa pipeline.timeout_hours
+  timeout_seconds: 0
+  # Metriche di performance nel log
+  metrics: true
+  # Abilita data integrity check dopo import
+  post_import_validation: true
+  # Ricompila oggetti invalidi dopo import
+  recompile_invalid_objects: true
+
+# ---------------------------------------------------------------------------
+# Storage — Configurazione OCI Object Storage
+# ---------------------------------------------------------------------------
+storage:
+  # Giorni di retention per i dump nel bucket
+  retention_days: 30
+  # Soglia per upload multipart (MB)
+  multipart_threshold_mb: 100
+  # Dimensione singola parte per upload multipart (MB)
+  multipart_part_size_mb: 128
+  # Upload paralleli per multipart
+  multipart_parallel_count: 3
+  # Numero massimo tentativi upload/download
+  max_retries: 3
+  # Ritardo base per retry (secondi)
+  retry_delay_seconds: 5
+  # Prefisso per organizzazione oggetti nel bucket
+  object_prefix_format: "{environment}/{schema}/{date}"
+  # Abilita cleanup automatico dopo retention
+  auto_cleanup: true
+  # Verifica integrità dopo upload (MD5)
+  verify_upload_integrity: true
+
+# ---------------------------------------------------------------------------
+# Notification — Notifiche e alerting
+# ---------------------------------------------------------------------------
+notification:
+  # Invia email al completamento con successo
+  email_on_success: true
+  # Invia email in caso di errore
+  email_on_failure: true
+  # Lista destinatari email (sovrascrivibile per ambiente)
+  email_recipients:
+    - "dba-team@eni.com"
+    - "devops-team@eni.com"
+  # Destinatari aggiuntivi solo per errori in produzione
+  email_recipients_prod_failure:
+    - "dba-team@eni.com"
+    - "devops-team@eni.com"
+    - "it-management@eni.com"
+  # Integrazione Slack
+  slack_enabled: false
+  slack_channel: "#eni-dba-alerts"
+  slack_credential_id: "eni-slack-webhook"
+  # Livello minimo notifiche Slack (SUCCESS | WARNING | FAILURE)
+  slack_min_level: "WARNING"
+  # Microsoft Teams (alternativa)
+  teams_enabled: false
+  teams_webhook_credential_id: "eni-teams-webhook"
+
+# ---------------------------------------------------------------------------
+# Security — Politiche di sicurezza e audit
+# ---------------------------------------------------------------------------
+security:
+  # Richiedi conferma manuale per operazioni su PROD
+  require_confirmation_for_prod: true
+  # Richiedi conferma manuale per operazioni DROP/REPLACE
+  require_confirmation_for_drop: true
+  # Audit di tutte le operazioni Data Pump
+  audit_all_operations: true
+  # Crittografia obbligatoria per dump PROD
+  require_encryption_for_prod: false
+  # Verifica che lo schema sia nell'elenco schemas_allowed
+  enforce_schema_allowlist: true
+  # Timeout per conferma manuale (minuti) — 0 = attendi indefinitamente
+  confirmation_timeout_minutes: 30
+  # Utente Jenkins autorizzati per PROD
+  authorized_users_prod:
+    - "admin"
+    - "dba-lead"
+    - "dba-senior"
+  # Maschera credenziali nei log
+  mask_credentials_in_logs: true
+  # Abilita dry-run per test (SQLFILE senza import effettivo)
+  allow_dry_run: true
+
+# ---------------------------------------------------------------------------
+# Naming — Convenzioni di nomenclatura per file generati
+# ---------------------------------------------------------------------------
+naming:
+  # Formato nome file dump
+  # Variabili disponibili: {schema}, {date}, {time}, {timestamp}, {env}, {db_name}
+  dump_format: "{schema}_{date}_{time}.dmp"
+  # Formato nome file dump con parallelismo (%U è placeholder Oracle)
+  dump_parallel_format: "{schema}_{date}_%U.dmp"
+  # Formato nome file log
+  log_format: "{schema}_{operation}_{date}_{time}.log"
+  # Suffisso per backup pre-import
+  backup_suffix: "_BKP_{date}"
+  # Formato data per nomi file (strftime)
+  date_format: "%Y%m%d"
+  # Formato ora per nomi file (strftime)
+  time_format: "%H%M%S"
+  # Formato timestamp combinato (strftime)
+  timestamp_format: "%Y%m%d_%H%M%S"
+  # Prefisso job Data Pump
+  job_prefix: "ENI"
+  # Lunghezza massima nome job Oracle (limite Oracle: 30 caratteri, 128 da 12.2+)
+  max_job_name_length: 30
+
+# ---------------------------------------------------------------------------
+# Health Check — Configurazione controlli pre-pipeline
+# ---------------------------------------------------------------------------
+health_check:
+  # Abilita health check automatico prima di ogni operazione
+  enabled: true
+  # Spazio disco minimo richiesto (GB)
+  min_disk_space_gb: 10
+  # Verifica listener Oracle
+  check_listener: true
+  # Verifica job Data Pump già in esecuzione
+  check_running_jobs: true
+  # Timeout per singolo controllo (secondi)
+  check_timeout_seconds: 30
+  # Azione se health check fallisce: ABORT | WARN | IGNORE
+  on_failure: "ABORT"
+
+# ---------------------------------------------------------------------------
+# Logging — Configurazione logging della pipeline
+# ---------------------------------------------------------------------------
+logging:
+  # Livello di log (DEBUG | INFO | WARN | ERROR)
+  level: "INFO"
+  # Abilita output ANSI colorato
+  ansi_colors: true
+  # Abilita timestamp nei log
+  timestamps: true
+  # Retention log locali (giorni)
+  local_retention_days: 30
+  # Carica log su Object Storage
+  upload_logs_to_bucket: true
+  # Prefisso per log nel bucket
+  log_bucket_prefix: "logs/{environment}/{date}"
+
+# ---------------------------------------------------------------------------
+# Environment Overrides — Sovrascritture per ambiente
+# Questi valori sovrascrivono i default sopra quando l'ambiente corrisponde
+# ---------------------------------------------------------------------------
+environment_overrides:
+  PROD:
+    pipeline:
+      timeout_hours: 12
+      max_retries: 5
+    export:
+      parallel: 8
+      compression: "ALL"
+    import:
+      table_exists_action: "SKIP"
+      post_import_validation: true
+    storage:
+      retention_days: 90
+    security:
+      require_confirmation_for_prod: true
+      require_encryption_for_prod: false
+      enforce_schema_allowlist: true
+
+  UAT:
+    pipeline:
+      timeout_hours: 6
+    export:
+      parallel: 4
+    storage:
+      retention_days: 14
+    security:
+      require_confirmation_for_prod: false
+      enforce_schema_allowlist: true
+
+  DEV:
+    pipeline:
+      timeout_hours: 4
+    export:
+      parallel: 2
+      compression: "NONE"
+    import:
+      table_exists_action: "REPLACE"
+    storage:
+      retention_days: 7
+      auto_cleanup: true
+    security:
+      require_confirmation_for_prod: false
+      require_confirmation_for_drop: false
+      enforce_schema_allowlist: false
+
+  DR:
+    pipeline:
+      timeout_hours: 12
+      max_retries: 5
+    export:
+      parallel: 8
+      compression: "ALL"
+    storage:
+      retention_days: 90
+    security:
+      require_confirmation_for_prod: true

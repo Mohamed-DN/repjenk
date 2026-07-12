@@ -1,0 +1,298 @@
+# =============================================================================
+# ENI Oracle Database Registry
+# Progetto: ENI Oracle Data Pump Automation Pipeline
+#
+# Questo file definisce tutte le connessioni database disponibili alla pipeline.
+# I credential_id fanno riferimento a entry nel Jenkins Credentials Store.
+#
+# Tipi supportati:
+#   - autonomous : Autonomous Database (ATP/ADW) — usa PL/SQL DBMS_DATAPUMP
+#   - dbcs       : Database Cloud Service (VM/BM) — usa CLI expdp/impdp via SSH
+#
+# Ambienti:
+#   - PROD : Produzione — richiede conferma manuale per operazioni distruttive
+#   - UAT  : User Acceptance Testing
+#   - DEV  : Sviluppo
+#   - DR   : Disaster Recovery
+#
+# ATTENZIONE: Non inserire credenziali in chiaro. Utilizzare esclusivamente
+#             i riferimenti al Jenkins Credentials Store (credential_id).
+# =============================================================================
+
+# ---------------------------------------------------------------------------
+# Valori predefiniti — applicati a tutti i database se non sovrascritti
+# ---------------------------------------------------------------------------
+defaults:
+  oci_region: "eu-milan-1"
+  bucket: "eni-datapump-shared"
+  parallel: 4
+  compression: "BASIC"
+  retention_days: 30
+  notification_channel: "#eni-dba-alerts"
+  tags:
+    project: "ENI-DBA"
+    managed_by: "jenkins-pipeline"
+
+# ---------------------------------------------------------------------------
+# Registro Database
+# ---------------------------------------------------------------------------
+databases:
+
+  # ==========================================================================
+  # PRODUZIONE — Autonomous Database
+  # ==========================================================================
+
+  PROD_ATP_CORE:
+    type: autonomous
+    description: "Produzione — Core Business ATP (OLTP)"
+    environment: PROD
+    service_name: "prodcore_atp_high"
+    wallet_credential_id: "eni-prod-core-wallet"
+    db_credential_id: "eni-prod-core-creds"
+    oci_region: "eu-milan-1"
+    compartment_id: "ocid1.compartment.oc1..aaaaaaaaprod123456789"
+    adb_ocid: "ocid1.autonomousdatabase.oc1.eu-milan-1.aaaaaaaaprodcore"
+    bucket: "eni-datapump-prod"
+    credential_name: "OCI_CRED_PROD"
+    default_tablespace: "DATA"
+    parallel: 8
+    compression: "ALL"
+    retention_days: 90
+    # Servizi disponibili per Autonomous (_high, _medium, _low, _tp, _tpurgent)
+    available_services:
+      - "prodcore_atp_high"
+      - "prodcore_atp_medium"
+      - "prodcore_atp_low"
+    schemas_allowed:
+      - "ENI_CORE"
+      - "ENI_FINANCE"
+      - "ENI_HR"
+    max_dump_size_gb: 500
+    tags:
+      business_unit: "Core Systems"
+      criticality: "P1"
+      backup_policy: "daily"
+
+  PROD_ADW_ANALYTICS:
+    type: autonomous
+    description: "Produzione — Analytics ADW (Data Warehouse)"
+    environment: PROD
+    service_name: "prodanalytics_adw_high"
+    wallet_credential_id: "eni-prod-analytics-wallet"
+    db_credential_id: "eni-prod-analytics-creds"
+    oci_region: "eu-milan-1"
+    compartment_id: "ocid1.compartment.oc1..aaaaaaaaprod123456789"
+    adb_ocid: "ocid1.autonomousdatabase.oc1.eu-milan-1.aaaaaaaaprodadw"
+    bucket: "eni-datapump-prod"
+    credential_name: "OCI_CRED_PROD"
+    default_tablespace: "DATA"
+    parallel: 16
+    compression: "ALL"
+    retention_days: 60
+    available_services:
+      - "prodanalytics_adw_high"
+      - "prodanalytics_adw_medium"
+      - "prodanalytics_adw_low"
+    schemas_allowed:
+      - "ENI_DWH"
+      - "ENI_STAGING"
+      - "ENI_REPORTING"
+    max_dump_size_gb: 1000
+    tags:
+      business_unit: "Analytics & BI"
+      criticality: "P1"
+      backup_policy: "daily"
+
+  # ==========================================================================
+  # PRODUZIONE — DBCS (Database Cloud Service / VM)
+  # ==========================================================================
+
+  PROD_DBCS_ERP:
+    type: dbcs
+    description: "Produzione — ERP Database (DBCS VM)"
+    environment: PROD
+    host: "prod-erp-db.subnet-prod.vcn-prod.oraclevcn.com"
+    port: 1521
+    service_name: "prod_erp_pdb1.subnet-prod.vcn-prod.oraclevcn.com"
+    db_credential_id: "eni-prod-erp-creds"
+    ssh_credential_id: "eni-prod-erp-ssh"
+    ssh_user: "opc"
+    oracle_user: "oracle"
+    oracle_home: "/u01/app/oracle/product/19.0.0/dbhome_1"
+    data_pump_dir: "DATA_PUMP_DIR"
+    data_pump_path: "/u01/app/oracle/admin/datapump"
+    oci_region: "eu-milan-1"
+    bucket: "eni-datapump-prod"
+    default_tablespace: "ENI_DATA"
+    temp_tablespace: "TEMP"
+    parallel: 8
+    compression: "ALL"
+    retention_days: 90
+    schemas_allowed:
+      - "ENI_ERP"
+      - "ENI_ERP_STAGING"
+    max_dump_size_gb: 750
+    tags:
+      business_unit: "ERP"
+      criticality: "P1"
+      backup_policy: "daily"
+
+  # ==========================================================================
+  # UAT — User Acceptance Testing
+  # ==========================================================================
+
+  UAT_DBCS_01:
+    type: dbcs
+    description: "UAT — Database Cloud Service principale"
+    environment: UAT
+    host: "uat-db-01.subnet-uat.vcn-uat.oraclevcn.com"
+    port: 1521
+    service_name: "uat_pdb1.subnet-uat.vcn-uat.oraclevcn.com"
+    db_credential_id: "eni-uat-dbcs-creds"
+    ssh_credential_id: "eni-uat-dbcs-ssh"
+    ssh_user: "opc"
+    oracle_user: "oracle"
+    oracle_home: "/u01/app/oracle/product/19.0.0/dbhome_1"
+    data_pump_dir: "DATA_PUMP_DIR"
+    data_pump_path: "/u01/app/oracle/admin/datapump"
+    oci_region: "eu-milan-1"
+    bucket: "eni-datapump-uat"
+    default_tablespace: "USERS"
+    temp_tablespace: "TEMP"
+    parallel: 4
+    compression: "BASIC"
+    retention_days: 14
+    schemas_allowed:
+      - "ENI_CORE"
+      - "ENI_ERP"
+      - "ENI_DWH"
+      - "ENI_TEST"
+    max_dump_size_gb: 200
+    tags:
+      business_unit: "QA"
+      criticality: "P3"
+      backup_policy: "weekly"
+
+  UAT_ATP_01:
+    type: autonomous
+    description: "UAT — Autonomous Transaction Processing"
+    environment: UAT
+    service_name: "uatatp01_high"
+    wallet_credential_id: "eni-uat-atp-wallet"
+    db_credential_id: "eni-uat-atp-creds"
+    oci_region: "eu-milan-1"
+    compartment_id: "ocid1.compartment.oc1..aaaaaaaauat123456789"
+    adb_ocid: "ocid1.autonomousdatabase.oc1.eu-milan-1.aaaaaaaauatatp01"
+    bucket: "eni-datapump-uat"
+    credential_name: "OCI_CRED_UAT"
+    default_tablespace: "DATA"
+    parallel: 4
+    compression: "BASIC"
+    retention_days: 14
+    available_services:
+      - "uatatp01_high"
+      - "uatatp01_medium"
+      - "uatatp01_low"
+    schemas_allowed:
+      - "ENI_CORE"
+      - "ENI_FINANCE"
+      - "ENI_TEST"
+    max_dump_size_gb: 100
+    tags:
+      business_unit: "QA"
+      criticality: "P3"
+      backup_policy: "weekly"
+
+  # ==========================================================================
+  # SVILUPPO
+  # ==========================================================================
+
+  DEV_ATP_01:
+    type: autonomous
+    description: "Sviluppo — Autonomous Transaction Processing"
+    environment: DEV
+    service_name: "devatp01_medium"
+    wallet_credential_id: "eni-dev-atp-wallet"
+    db_credential_id: "eni-dev-atp-creds"
+    oci_region: "eu-milan-1"
+    compartment_id: "ocid1.compartment.oc1..aaaaaaaadev123456789"
+    adb_ocid: "ocid1.autonomousdatabase.oc1.eu-milan-1.aaaaaaaadev01"
+    bucket: "eni-datapump-dev"
+    credential_name: "OCI_CRED_DEV"
+    default_tablespace: "DATA"
+    parallel: 2
+    compression: "BASIC"
+    retention_days: 7
+    available_services:
+      - "devatp01_high"
+      - "devatp01_medium"
+      - "devatp01_low"
+    schemas_allowed: []  # Nessuna restrizione in DEV
+    max_dump_size_gb: 50
+    tags:
+      business_unit: "Development"
+      criticality: "P4"
+      backup_policy: "none"
+
+  DEV_DBCS_01:
+    type: dbcs
+    description: "Sviluppo — DBCS per test integrazione"
+    environment: DEV
+    host: "dev-db-01.subnet-dev.vcn-dev.oraclevcn.com"
+    port: 1521
+    service_name: "dev_pdb1.subnet-dev.vcn-dev.oraclevcn.com"
+    db_credential_id: "eni-dev-dbcs-creds"
+    ssh_credential_id: "eni-dev-dbcs-ssh"
+    ssh_user: "opc"
+    oracle_user: "oracle"
+    oracle_home: "/u01/app/oracle/product/19.0.0/dbhome_1"
+    data_pump_dir: "DATA_PUMP_DIR"
+    data_pump_path: "/u01/app/oracle/admin/datapump"
+    oci_region: "eu-milan-1"
+    bucket: "eni-datapump-dev"
+    default_tablespace: "USERS"
+    temp_tablespace: "TEMP"
+    parallel: 2
+    compression: "NONE"
+    retention_days: 7
+    schemas_allowed: []  # Nessuna restrizione in DEV
+    max_dump_size_gb: 50
+    tags:
+      business_unit: "Development"
+      criticality: "P4"
+      backup_policy: "none"
+
+  # ==========================================================================
+  # DISASTER RECOVERY
+  # ==========================================================================
+
+  DR_ATP_CORE:
+    type: autonomous
+    description: "Disaster Recovery — Core Business ATP (standby)"
+    environment: DR
+    service_name: "drcore_atp_high"
+    wallet_credential_id: "eni-dr-core-wallet"
+    db_credential_id: "eni-dr-core-creds"
+    oci_region: "eu-frankfurt-1"
+    compartment_id: "ocid1.compartment.oc1..aaaaaaaadr123456789"
+    adb_ocid: "ocid1.autonomousdatabase.oc1.eu-frankfurt-1.aaaaaaaadrcore"
+    bucket: "eni-datapump-dr"
+    credential_name: "OCI_CRED_DR"
+    default_tablespace: "DATA"
+    parallel: 8
+    compression: "ALL"
+    retention_days: 90
+    available_services:
+      - "drcore_atp_high"
+      - "drcore_atp_medium"
+    schemas_allowed:
+      - "ENI_CORE"
+      - "ENI_FINANCE"
+      - "ENI_HR"
+    max_dump_size_gb: 500
+    # DR è in regione diversa (Francoforte) per resilienza geografica
+    tags:
+      business_unit: "DR"
+      criticality: "P1"
+      backup_policy: "continuous"
+      dr_pair: "PROD_ATP_CORE"
