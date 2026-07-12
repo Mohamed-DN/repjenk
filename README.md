@@ -12,6 +12,7 @@
 
 ## 📋 Indice
 
+0. [🏁 DA DOVE INIZIARE](#-da-dove-iniziare)
 1. [Panoramica](#-panoramica)
 2. [Prerequisiti](#-prerequisiti)
 3. [Installazione e Setup](#-installazione-e-setup)
@@ -22,6 +23,15 @@
 8. [Troubleshooting](#-troubleshooting)
 9. [Struttura del Progetto](#-struttura-del-progetto)
 10. [Contributing](#-contributing)
+
+---
+
+## 🏁 Da Dove Iniziare
+
+> [!IMPORTANT]
+> **Sei nuovo nel progetto?**  
+> Prima di immergerti nei dettagli tecnici, fermati e leggi il file **[START_HERE.md](file:///c:/DBA/eni-oracle-datapump-pipeline/START_HERE.md)**. 
+> Contiene la mappa dell'intero repository e l'ordine corretto in cui leggere la documentazione.
 
 ---
 

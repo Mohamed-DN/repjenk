@@ -208,7 +208,7 @@ def autonomousExport(Map dbConfig, String schema, Map options = [:]) {
 DECLARE
     v_handle   NUMBER;
     v_status   VARCHAR2(200);
-    v_job_name VARCHAR2(128) := '${jobName}';
+    v_job_name VARCHAR2(128) := '${jobName.replace("'", "''")}';
 BEGIN
     -- Apertura job Data Pump di tipo EXPORT
     v_handle := DBMS_DATAPUMP.OPEN(
@@ -221,7 +221,7 @@ BEGIN
     -- Configurazione file dump su Object Storage (credenziale OCI preconfigurata)
     DBMS_DATAPUMP.ADD_FILE(
         handle    => v_handle,
-        filename  => '${dumpFilename}',
+        filename  => '${dumpFilename.replace("'", "''")}',
         directory => '${options.bucketName ? "DATA_PUMP_DIR" : "DATA_PUMP_DIR"}',
         filetype  => DBMS_DATAPUMP.KU\$_FILE_TYPE_DUMP_FILE
     );
@@ -229,7 +229,7 @@ BEGIN
     -- File di log
     DBMS_DATAPUMP.ADD_FILE(
         handle    => v_handle,
-        filename  => '${logFilename}',
+        filename  => '${logFilename.replace("'", "''")}',
         directory => 'DATA_PUMP_DIR',
         filetype  => DBMS_DATAPUMP.KU\$_FILE_TYPE_LOG_FILE
     );
@@ -238,12 +238,12 @@ BEGIN
     DBMS_DATAPUMP.METADATA_FILTER(
         handle => v_handle,
         name   => 'SCHEMA_EXPR',
-        value  => 'IN (''${schema}'')'
+        value  => 'IN (''${schema.replace("'", "''")}'')'
     );
 """
     // Filtro tabelle specifiche se presenti
     if (options.tables) {
-        def tableList = options.tables.collect { "'${it.toUpperCase()}'" }.join(',')
+        def tableList = options.tables.collect { "'${it.toUpperCase().replace("'", "''")}'" }.join(',')
         plsqlBlock += """
     -- Filtro tabelle specifiche
     DBMS_DATAPUMP.METADATA_FILTER(
@@ -256,7 +256,7 @@ BEGIN
 
     // Esclusione tabelle se specificato
     if (options.excludeTables) {
-        def excludeList = options.excludeTables.collect { "'${it.toUpperCase()}'" }.join(',')
+        def excludeList = options.excludeTables.collect { "'${it.toUpperCase().replace("'", "''")}'" }.join(',')
         plsqlBlock += """
     -- Esclusione tabelle non desiderate
     DBMS_DATAPUMP.METADATA_FILTER(
@@ -276,7 +276,7 @@ BEGIN
         handle      => v_handle,
         name        => 'SUBQUERY',
         value       => '${options.queryFilter.replace("'", "''")}',
-        schema_name => '${schema}'
+        schema_name => '${schema.replace("'", "''")}'
     );
 """
     }
@@ -293,7 +293,7 @@ BEGIN
     DBMS_DATAPUMP.SET_PARAMETER(
         handle => v_handle,
         name   => 'COMPRESSION',
-        value  => '${compression}'
+        value  => '${compression.replace("'", "''")}'
     );
 
     -- Supporto Restartability
@@ -306,7 +306,7 @@ BEGIN
 
     // Data Masking
     if (options.maskingRules) {
-        options.maskingRules.split(',').each { rule ->
+        for (def rule in options.maskingRules.split(',')) {
             def ruleParts = rule.split(':')
             if (ruleParts.length == 2) {
                 def colParts = ruleParts[0].split('\\.')
@@ -316,10 +316,10 @@ BEGIN
     DBMS_DATAPUMP.DATA_REMAP(
         handle       => v_handle,
         name         => 'COLUMN_FUNCTION',
-        table_name   => '${colParts[1]}',
-        column       => '${colParts[2]}',
-        function     => '${ruleParts[1]}',
-        schema_name  => '${colParts[0]}'
+        table_name   => '${colParts[1].replace("'", "''")}',
+        column       => '${colParts[2].replace("'", "''")}',
+        function     => '${ruleParts[1].replace("'", "''")}',
+        schema_name  => '${colParts[0].replace("'", "''")}'
     );
 """
                 }
@@ -359,13 +359,18 @@ BEGIN
     DBMS_DATAPUMP.DETACH(handle => v_handle);
 
     DBMS_OUTPUT.PUT_LINE('JOB_NAME=' || v_job_name);
-    DBMS_OUTPUT.PUT_LINE('DUMP_FILE=' || '${dumpFilename}');
+    DBMS_OUTPUT.PUT_LINE('DUMP_FILE=' || '${dumpFilename.replace("'", "''")}');
 EXCEPTION
     WHEN OTHERS THEN
+        DBMS_OUTPUT.PUT_LINE('ERRORE FATALE IN DBMS_DATAPUMP: ' || SQLERRM);
+        DBMS_OUTPUT.PUT_LINE(DBMS_UTILITY.FORMAT_ERROR_BACKTRACE);
         BEGIN
-            DBMS_DATAPUMP.DETACH(handle => v_handle);
-        EXCEPTION
-            WHEN OTHERS THEN NULL;
+            DBMS_DATAPUMP.STOP_JOB(handle => v_handle, immediate => 1, keep_master => 0);
+        EXCEPTION WHEN OTHERS THEN 
+            BEGIN
+                DBMS_DATAPUMP.DETACH(handle => v_handle);
+            EXCEPTION WHEN OTHERS THEN NULL;
+            END;
         END;
         RAISE;
 END;
@@ -402,7 +407,7 @@ def autonomousImport(Map dbConfig, String schema, Map options = [:]) {
     def plsqlBlock = """
 DECLARE
     v_handle   NUMBER;
-    v_job_name VARCHAR2(128) := '${jobName}';
+    v_job_name VARCHAR2(128) := '${jobName.replace("'", "''")}';
 BEGIN
     -- Apertura job Data Pump di tipo IMPORT
     v_handle := DBMS_DATAPUMP.OPEN(
@@ -415,7 +420,7 @@ BEGIN
     -- File dump sorgente
     DBMS_DATAPUMP.ADD_FILE(
         handle    => v_handle,
-        filename  => '${dumpFilename}',
+        filename  => '${dumpFilename.replace("'", "''")}',
         directory => 'DATA_PUMP_DIR',
         filetype  => DBMS_DATAPUMP.KU\$_FILE_TYPE_DUMP_FILE
     );
@@ -423,7 +428,7 @@ BEGIN
     -- File di log per import
     DBMS_DATAPUMP.ADD_FILE(
         handle    => v_handle,
-        filename  => '${logFilename}',
+        filename  => '${logFilename.replace("'", "''")}',
         directory => 'DATA_PUMP_DIR',
         filetype  => DBMS_DATAPUMP.KU\$_FILE_TYPE_LOG_FILE
     );
@@ -432,7 +437,7 @@ BEGIN
     DBMS_DATAPUMP.SET_PARAMETER(
         handle => v_handle,
         name   => 'TABLE_EXISTS_ACTION',
-        value  => '${tableExistsAction}'
+        value  => '${tableExistsAction.replace("'", "''")}'
     );
 """
 
@@ -443,8 +448,8 @@ BEGIN
     DBMS_DATAPUMP.METADATA_REMAP(
         handle    => v_handle,
         name      => 'REMAP_SCHEMA',
-        old_value => '${options.remapSchema.from}',
-        value     => '${options.remapSchema.to}'
+        old_value => '${options.remapSchema.from.replace("'", "''")}',
+        value     => '${options.remapSchema.to.replace("'", "''")}'
     );
 """
     }
@@ -456,8 +461,8 @@ BEGIN
     DBMS_DATAPUMP.METADATA_REMAP(
         handle    => v_handle,
         name      => 'REMAP_TABLESPACE',
-        old_value => '${options.remapTablespace.from}',
-        value     => '${options.remapTablespace.to}'
+        old_value => '${options.remapTablespace.from.replace("'", "''")}',
+        value     => '${options.remapTablespace.to.replace("'", "''")}'
     );
 """
     }
@@ -469,15 +474,15 @@ BEGIN
     DBMS_DATAPUMP.METADATA_REMAP(
         handle    => v_handle,
         name      => 'REMAP_TABLE',
-        old_value => '${options.remapTable.from}',
-        value     => '${options.remapTable.to}'
+        old_value => '${options.remapTable.from.replace("'", "''")}',
+        value     => '${options.remapTable.to.replace("'", "''")}'
     );
 """
     }
 
     // Filtro tabelle specifiche per import selettivo
     if (options.tables) {
-        def tableList = options.tables.collect { "'${it.toUpperCase()}'" }.join(',')
+        def tableList = options.tables.collect { "'${it.toUpperCase().replace("'", "''")}'" }.join(',')
         plsqlBlock += """
     -- Filtro tabelle specifiche per import selettivo
     DBMS_DATAPUMP.METADATA_FILTER(
@@ -505,7 +510,7 @@ BEGIN
 
     // Data Masking per Import
     if (options.maskingRules) {
-        options.maskingRules.split(',').each { rule ->
+        for (def rule in options.maskingRules.split(',')) {
             def ruleParts = rule.split(':')
             if (ruleParts.length == 2) {
                 def colParts = ruleParts[0].split('\\.')
@@ -515,10 +520,10 @@ BEGIN
     DBMS_DATAPUMP.DATA_REMAP(
         handle       => v_handle,
         name         => 'COLUMN_FUNCTION',
-        table_name   => '${colParts[1]}',
-        column       => '${colParts[2]}',
-        function     => '${ruleParts[1]}',
-        schema_name  => '${colParts[0]}'
+        table_name   => '${colParts[1].replace("'", "''")}',
+        column       => '${colParts[2].replace("'", "''")}',
+        function     => '${ruleParts[1].replace("'", "''")}',
+        schema_name  => '${colParts[0].replace("'", "''")}'
     );
 """
                 }
@@ -536,10 +541,15 @@ BEGIN
     DBMS_OUTPUT.PUT_LINE('JOB_NAME=' || v_job_name);
 EXCEPTION
     WHEN OTHERS THEN
+        DBMS_OUTPUT.PUT_LINE('ERRORE FATALE IN DBMS_DATAPUMP: ' || SQLERRM);
+        DBMS_OUTPUT.PUT_LINE(DBMS_UTILITY.FORMAT_ERROR_BACKTRACE);
         BEGIN
-            DBMS_DATAPUMP.DETACH(handle => v_handle);
-        EXCEPTION
-            WHEN OTHERS THEN NULL;
+            DBMS_DATAPUMP.STOP_JOB(handle => v_handle, immediate => 1, keep_master => 0);
+        EXCEPTION WHEN OTHERS THEN 
+            BEGIN
+                DBMS_DATAPUMP.DETACH(handle => v_handle);
+            EXCEPTION WHEN OTHERS THEN NULL;
+            END;
         END;
         RAISE;
 END;
@@ -655,19 +665,19 @@ EXIT;
 
     // Blocco PL/SQL per eseguire lo swap atomico delle tabelle
     def swapPlsql = "BEGIN\n"
-    tables.each { table ->
+    for (def table in tables) {
         // Passo 1: Rinomina tabella corrente → _BKP
         swapPlsql += """
     -- Swap tabella: ${table}
     BEGIN
-        EXECUTE IMMEDIATE 'ALTER TABLE ${schema}.${table} RENAME TO ${table}_BKP';
+        EXECUTE IMMEDIATE 'ALTER TABLE ${schema.replace("'", "''")}.${table.replace("'", "''")} RENAME TO ${table.replace("'", "''")}_BKP';
     EXCEPTION WHEN OTHERS THEN
         IF SQLCODE != -942 THEN RAISE; END IF;
     END;
     -- Rinomina nuova tabella al nome originale
     BEGIN
-        EXECUTE IMMEDIATE 'ALTER TABLE ${newSchema}.${table} RENAME TO ${table}';
-        EXECUTE IMMEDIATE 'ALTER TABLE ${schema}.${table} RENAME TO ${schema}.${table}'; -- placeholder
+        EXECUTE IMMEDIATE 'ALTER TABLE ${newSchema.replace("'", "''")}.${table.replace("'", "''")} RENAME TO ${table.replace("'", "''")}';
+        EXECUTE IMMEDIATE 'ALTER TABLE ${schema.replace("'", "''")}.${table.replace("'", "''")} RENAME TO ${schema.replace("'", "''")}.${table.replace("'", "''")}'; -- placeholder
     EXCEPTION WHEN OTHERS THEN
         IF SQLCODE != -942 THEN RAISE; END IF;
     END;
@@ -676,11 +686,11 @@ EXIT;
 
     // Eventuale drop delle tabelle _BKP
     if (dropOld) {
-        tables.each { table ->
+        for (def table in tables) {
             swapPlsql += """
     -- Eliminazione backup: ${table}_BKP
     BEGIN
-        EXECUTE IMMEDIATE 'DROP TABLE ${schema}.${table}_BKP CASCADE CONSTRAINTS PURGE';
+        EXECUTE IMMEDIATE 'DROP TABLE ${schema.replace("'", "''")}.${table.replace("'", "''")}_BKP CASCADE CONSTRAINTS PURGE';
     EXCEPTION WHEN OTHERS THEN
         IF SQLCODE != -942 THEN RAISE; END IF;
     END;
@@ -739,7 +749,7 @@ def buildExpdpCommand(Map dbConfig, String schema, Map options) {
 
     // Filtro tabelle da escludere
     if (options.excludeTables) {
-        options.excludeTables.each { table ->
+        for (def table in options.excludeTables) {
             cmd.append(" EXCLUDE=TABLE:\"IN ('${table.toUpperCase()}')\"")
         }
     }

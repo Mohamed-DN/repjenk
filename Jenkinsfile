@@ -340,10 +340,22 @@ pipeline {
                         env.EFFECTIVE_TARGET_SCHEMA = params.REMAP_SCHEMA?.trim() ?: params.SCHEMA_NAME
                     }
 
-                    // --- Preparazione directory di lavoro ---
-                    sh """
+                    // --- Pre-flight Checks e Preparazione directory ---
+                    sh """#!/bin/bash
+                        set -eo pipefail
+                        
+                        echo "[INFO] Esecuzione pre-flight checks sui client richiesti..."
+                        if ! command -v sqlplus &> /dev/null; then
+                            echo -e "\\e[31m[ERRORE FATALE] Comando 'sqlplus' non trovato nel PATH.\\e[0m"
+                            exit 1
+                        fi
+                        if ! command -v oci &> /dev/null; then
+                            echo -e "\\e[31m[ERRORE FATALE] OCI CLI ('oci') non trovata nel PATH.\\e[0m"
+                            exit 1
+                        fi
+                        
                         mkdir -p ${DUMP_DIR} ${LOG_DIR} ${REPORT_DIR}
-                        echo "[INFO] Directory di lavoro preparate."
+                        echo "[INFO] Client verificati e directory di lavoro preparate."
                     """
 
                     // --- Riepilogo inizializzazione ---
@@ -414,10 +426,29 @@ Impostare CONFIRM_DESTRUCTIVE = true per procedere.
 Questa misura è obbligatoria per la policy di sicurezza ENI."""
                     }
 
+                    // --- Validazione formati e caratteri per prevenzione SQL Injection ---
+                    def identifierRegex = /^[a-zA-Z0-9_\\\$#:\.,]*$/
+                    def paramsToValidate = [
+                        'SCHEMA_NAME': params.SCHEMA_NAME,
+                        'REMAP_SCHEMA': params.REMAP_SCHEMA,
+                        'REMAP_TABLESPACE': params.REMAP_TABLESPACE,
+                        'MASKING_RULES': params.MASKING_RULES,
+                        'TABLE_LIST': params.TABLE_LIST,
+                        'REMAP_TABLE': params.REMAP_TABLE
+                    ]
+
+                    for (def entry in paramsToValidate.entrySet()) {
+                        def paramName = entry.key
+                        def paramValue = entry.value
+                        if (paramValue?.trim() && !(paramValue ==~ identifierRegex)) {
+                            errors << "Il parametro ${paramName} contiene caratteri non validi. Sono consentiti solo alfanumerici, underscore e [\$#:,.]"
+                        }
+                    }
+
                     // --- Validazione formato REMAP_TABLE ---
                     if (params.REMAP_TABLE?.trim()) {
                         def pairs = params.REMAP_TABLE.split(',')
-                        pairs.each { pair ->
+                        for (def pair in pairs) {
                             if (!pair.trim().contains(':')) {
                                 errors << "Formato REMAP_TABLE non valido: '${pair}'. Formato atteso: OLD_TABLE:NEW_TABLE"
                             }
@@ -436,8 +467,8 @@ Questa misura è obbligatoria per la policy di sicurezza ENI."""
                         if (matcher.find()) {
                             errors << "QUERY_FILTER contiene keyword proibito: '${matcher.group(1).toUpperCase()}'"
                         }
-                        def forbidden = ['ALTER ', 'CREATE ', 'INSERT ', 'UPDATE ', '--', '/*']
-                        forbidden.each { keyword ->
+                        def forbidden = ['ALTER ', 'CREATE ', 'INSERT ', 'UPDATE ', '--', '/*', '||', 'CHR(', ';', 'DBMS_']
+                        for (def keyword in forbidden) {
                             if (params.QUERY_FILTER.toUpperCase().contains(keyword)) {
                                 errors << "QUERY_FILTER contiene keyword proibito: '${keyword.trim()}'"
                             }
@@ -965,7 +996,8 @@ Sei assolutamente sicuro di voler procedere?""",
 
                     // --- Approvazione manuale obbligatoria per swap su PROD ---
                     if (env.TGT_DB_ENV == 'PROD') {
-                        input message: """
+                        timeout(time: 30, unit: 'MINUTES') {
+                            input message: """
 🔴  SWAP SU PRODUZIONE — CONFERMA RICHIESTA
     Schema attuale: ${params.SCHEMA_NAME}
     Schema nuovo:   ${env.EFFECTIVE_TARGET_SCHEMA}
@@ -973,8 +1005,9 @@ Sei assolutamente sicuro di voler procedere?""",
 
 Lo schema corrente verrà rinominato in ${params.SCHEMA_NAME}_BKP
 e lo schema nuovo prenderà il nome di produzione.""",
-                              ok: 'CONFERMO SWAP SU PROD',
-                              submitter: 'dba-admin'
+                                  ok: 'CONFERMO SWAP SU PROD',
+                                  submitter: 'dba-admin'
+                        }
                     }
 
                     if (params.DRY_RUN) {
@@ -1134,7 +1167,7 @@ e lo schema nuovo prenderà il nome di produzione.""",
                     echo "├────────────────────┼──────────────┼──────────────┼────────────┤"
 
                     if (verificationResults.sourceRecords) {
-                        for (def entry : verificationResults.sourceRecords.entrySet()) {
+                        for (def entry in verificationResults.sourceRecords.entrySet()) {
                             def tableName = entry.key
                             def srcCount = entry.value
                             def tgtCount = verificationResults.targetRecords?.get(tableName) ?: 0
@@ -1153,7 +1186,7 @@ e lo schema nuovo prenderà il nome di produzione.""",
 
                     if (discrepancies) {
                         echo "\u001B[33m[ATTENZIONE] Trovate ${discrepancies.size()} discrepanze nei conteggi record.\u001B[0m"
-                        discrepancies.each { d ->
+                        for (def d in discrepancies) {
                             echo "  - ${d.table}: sorgente=${d.source}, target=${d.target}, differenza=${d.source - d.target}"
                         }
                         // Le discrepanze non bloccano la pipeline ma vengono segnalate nel report
