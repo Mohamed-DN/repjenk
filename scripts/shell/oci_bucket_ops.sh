@@ -32,7 +32,17 @@
 #   1 = Errore operativo
 #   2 = Errore parametri
 ###############################################################################
-set -o pipefail
+set -eo pipefail
+
+# ===========================================================================
+# Gestione Interruzioni
+# ===========================================================================
+trap 'catch_interrupt' INT TERM HUP
+
+catch_interrupt() {
+    echo -e "\033[0;31m[ERROR]\033[0m [$(date '+%Y-%m-%d %H:%M:%S')] Script interrotto forzatamente (Segnale di rete o sistema)." >&2
+    exit 130
+}
 
 # ===========================================================================
 # Costanti
@@ -120,8 +130,9 @@ detect_namespace() {
     oci_args="$(build_oci_args)"
 
     local ns_output
-    ns_output=$(eval oci os ns get ${oci_args} --output json 2>/dev/null)
-    if [[ $? -ne 0 ]]; then
+    local exit_code=0
+    ns_output=$(eval oci os ns get ${oci_args} --output json 2>/dev/null) || exit_code=$?
+    if [[ ${exit_code} -ne 0 ]]; then
         log_error "Impossibile determinare il namespace OCI. Verificare configurazione CLI."
         return 1
     fi
@@ -162,8 +173,8 @@ retry_with_backoff() {
         log_debug "Tentativo ${attempt}/${MAX_RETRIES}: ${description}"
 
         local output
-        output=$(eval "${cmd[*]}" 2>&1)
-        local exit_code=$?
+        local exit_code=0
+        output=$(eval "${cmd[*]}" 2>&1) || exit_code=$?
 
         if [[ ${exit_code} -eq 0 ]]; then
             echo "${output}"
@@ -215,7 +226,7 @@ do_upload() {
 
     # Calcolo dimensione file in MB
     local file_size_bytes
-    file_size_bytes=$(stat -c%s "${local_path}" 2>/dev/null || stat -f%z "${local_path}" 2>/dev/null)
+    file_size_bytes=$(stat -c%s "${local_path}" 2>/dev/null || stat -f%z "${local_path}" 2>/dev/null || echo "0")
     local file_size_mb=$(( file_size_bytes / 1048576 ))
 
     log_info "Upload: ${local_path} → ${bucket}/${object_name} (${file_size_mb} MB)"
@@ -301,7 +312,7 @@ do_download() {
     if [[ $? -eq 0 ]]; then
         local downloaded_size=0
         if [[ -f "${local_path}" ]]; then
-            downloaded_size=$(stat -c%s "${local_path}" 2>/dev/null || stat -f%z "${local_path}" 2>/dev/null)
+            downloaded_size=$(stat -c%s "${local_path}" 2>/dev/null || stat -f%z "${local_path}" 2>/dev/null || echo "0")
         fi
         log_info "Download completato: ${local_path} (${downloaded_size} bytes)"
         emit_json "success" "Download completato" \

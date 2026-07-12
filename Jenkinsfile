@@ -176,6 +176,13 @@ pipeline {
             description: 'Eliminare il backup dello schema vecchio (_BKP) dopo lo swap.'
         )
 
+        // --- Ottimizzazione ---
+        booleanParam(
+            name: 'GATHER_STATS_POST_IMPORT',
+            defaultValue: false,
+            description: 'Eseguire ricalcolo statistiche (DBMS_STATS) dopo l\'import per evitare degrado performance.'
+        )
+
         // --- Sicurezza e conferma ---
         booleanParam(
             name: 'CONFIRM_DESTRUCTIVE',
@@ -881,6 +888,40 @@ Sei assolutamente sicuro di voler procedere?""",
         }
 
         // =====================================================================
+        // STAGE 6.5: GATHER STATISTICS
+        // Ricalcolo statistiche dello schema importato
+        // =====================================================================
+        stage('Gather Statistics') {
+            when {
+                expression {
+                    params.OPERATION in ['IMPORT', 'EXPORT_AND_IMPORT', 'REFRESH_ENV', 'TABLE_IMPORT'] &&
+                    !params.DRY_RUN && params.GATHER_STATS_POST_IMPORT
+                }
+            }
+            steps {
+                script {
+                    echo "\u001B[36m[INFO] Avvio ricalcolo statistiche su target...\u001B[0m"
+                    withCredentials([usernamePassword(
+                        credentialsId: env.TGT_CRED_ID,
+                        usernameVariable: 'DB_USER',
+                        passwordVariable: 'DB_PASS'
+                    )]) {
+                        try {
+                            oracleConnect.runSql(
+                                [type: env.TGT_DB_TYPE, connectString: env.TGT_DB_CONNECT_STR, user: DB_USER, password: DB_PASS],
+                                "${env.WORKSPACE}/scripts/sql/gather_stats.sql",
+                                [ '1': env.EFFECTIVE_TARGET_SCHEMA, '2': params.PARALLEL ]
+                            )
+                            echo "\u001B[32m[✓] Statistiche ricalcolate con successo\u001B[0m"
+                        } catch (Exception e) {
+                            echo "\u001B[33m[ATTENZIONE] Fallimento durante il ricalcolo statistiche: ${e.getMessage()}. L'importazione non fallisce per questo.\u001B[0m"
+                        }
+                    }
+                }
+            }
+        }
+
+        // =====================================================================
         // STAGE 7: SWAP AND DROP
         // Scambio schema vecchio/nuovo e drop opzionale del backup
         // Questo stage è critico: ogni errore deve essere gestito con rollback
@@ -1229,6 +1270,11 @@ e lo schema nuovo prenderà il nome di produzione.""",
                     mimeType: 'text/html',
                     attachmentsPattern: "${REPORT_DIR}/*.html"
                 )
+                
+                // --- Notifica Teams ---
+                withCredentials([string(credentialsId: 'eni-teams-webhook', variable: 'TEAMS_WEBHOOK')]) {
+                    notifyResult.sendTeams(TEAMS_WEBHOOK, params.OPERATION, 'SUCCESS', 'Operazione Data Pump completata con successo.', env.BUILD_URL)
+                }
             }
         }
 
@@ -1268,6 +1314,11 @@ e lo schema nuovo prenderà il nome di produzione.""",
                     mimeType: 'text/html',
                     attachmentsPattern: "${LOG_DIR}/*.log"
                 )
+                
+                // --- Notifica Teams ---
+                withCredentials([string(credentialsId: 'eni-teams-webhook', variable: 'TEAMS_WEBHOOK')]) {
+                    notifyResult.sendTeams(TEAMS_WEBHOOK, params.OPERATION, 'FAILURE', "L'operazione è fallita. Verificare il log su Jenkins.", env.BUILD_URL)
+                }
             }
         }
 
@@ -1289,6 +1340,11 @@ nei conteggi record tra sorgente e destinazione.</p>
                     """,
                     mimeType: 'text/html'
                 )
+                
+                // --- Notifica Teams ---
+                withCredentials([string(credentialsId: 'eni-teams-webhook', variable: 'TEAMS_WEBHOOK')]) {
+                    notifyResult.sendTeams(TEAMS_WEBHOOK, params.OPERATION, 'WARNING', "Discrepanze rilevate nei conteggi post-import (${env.VERIFICATION_DISCREPANCIES} tabelle discordanti).", env.BUILD_URL)
+                }
             }
         }
 

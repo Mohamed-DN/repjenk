@@ -101,6 +101,52 @@ def sendSlack(String channel, String message, String status = 'INFO') {
 }
 
 // --------------------------------------------------------------------------
+// Invio notifica Microsoft Teams con Adaptive Cards
+// Utilizza un webhook configurato nei secret di Jenkins
+// --------------------------------------------------------------------------
+def sendTeams(String webhookUrl, String operation, String status, String message, String buildUrl) {
+    assert webhookUrl?.trim() : "Il webhook URL non può essere vuoto"
+    
+    echo "[Notify/Teams] ➤ Invio notifica a Microsoft Teams"
+    
+    def colorMap = [
+        'SUCCESS': '009639', // ENI_GREEN
+        'FAILURE': 'DC3545', // STATUS_RED
+        'WARNING': 'FDB813', // ENI_YELLOW
+        'INFO'   : '439FE0'
+    ]
+    def color = colorMap[status.toUpperCase()] ?: '439FE0'
+    
+    def payload = """{
+        "@type": "MessageCard",
+        "@context": "http://schema.org/extensions",
+        "themeColor": "${color}",
+        "summary": "ENI DataPump: ${operation} - ${status}",
+        "sections": [{
+            "activityTitle": "🛢️ **ENI Oracle Data Pump Pipeline**",
+            "activitySubtitle": "Operazione: ${operation}",
+            "facts": [
+                { "name": "Status:", "value": "${status}" },
+                { "name": "Message:", "value": "${message}" }
+            ],
+            "markdown": true
+        }],
+        "potentialAction": [{
+            "@type": "OpenUri",
+            "name": "Visualizza su Jenkins",
+            "targets": [{ "os": "default", "uri": "${buildUrl}" }]
+        }]
+    }"""
+    
+    try {
+        sh(script: "curl -s -H 'Content-Type: application/json' -d '${payload}' '${webhookUrl}' > /dev/null", returnStatus: true)
+        echo "[Notify/Teams] ✔ Notifica Teams inviata con successo"
+    } catch (Exception e) {
+        echo "[Notify/Teams] ⚠ Errore invio Teams: ${e.message}"
+    }
+}
+
+// --------------------------------------------------------------------------
 // Costruzione report HTML professionale con branding ENI
 // Dettagli operazione, tempistiche, dimensioni, confronto record
 // --------------------------------------------------------------------------

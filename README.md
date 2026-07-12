@@ -43,7 +43,8 @@ migrazione, backup e refresh degli ambienti.
 - ⏰ **Backup schedulati** tramite cron Jenkins
 - 🆕 **Creazione nuovo schema** con import e swap automatizzati
 - 🔐 **Gestione credenziali** sicura tramite Jenkins Credentials Store
-- 📊 **Notifiche e-mail** con report dettagliato a fine esecuzione
+- 📊 **Notifiche multi-canale** (E-mail, Slack, **Microsoft Teams**) con report dettagliato a fine esecuzione
+- 📈 **Ottimizzazione automatica** (Gather Statistics) post-import
 
 ### Architettura
 
@@ -163,6 +164,7 @@ flowchart TB
 | `oci-fingerprint` | Secret text | Fingerprint della chiave API |
 | `oracle-wallet-zip` | Secret file | Wallet ZIP per Autonomous DB |
 | `email-smtp-credentials` | Username/Password | Credenziali server SMTP |
+| `eni-teams-webhook` | Secret text | Webhook URL per canale Microsoft Teams |
 
 ---
 
