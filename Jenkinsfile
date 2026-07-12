@@ -431,7 +431,12 @@ Questa misura è obbligatoria per la policy di sicurezza ENI."""
 
                     // --- Validazione QUERY_FILTER: prevenzione SQL injection basilare ---
                     if (params.QUERY_FILTER?.trim()) {
-                        def forbidden = ['DROP ', 'DELETE ', 'TRUNCATE ', 'ALTER ', 'CREATE ', 'INSERT ', 'UPDATE ', '--', '/*']
+                        def forbiddenPattern = ~/(?i)\b(DROP|DELETE|TRUNCATE)\b/
+                        def matcher = forbiddenPattern.matcher(params.QUERY_FILTER)
+                        if (matcher.find()) {
+                            errors << "QUERY_FILTER contiene keyword proibito: '${matcher.group(1).toUpperCase()}'"
+                        }
+                        def forbidden = ['ALTER ', 'CREATE ', 'INSERT ', 'UPDATE ', '--', '/*']
                         forbidden.each { keyword ->
                             if (params.QUERY_FILTER.toUpperCase().contains(keyword)) {
                                 errors << "QUERY_FILTER contiene keyword proibito: '${keyword.trim()}'"
@@ -647,12 +652,14 @@ Questa misura è obbligatoria per la policy di sicurezza ENI."""
                     // --- Approvazione manuale per ambienti PROD ---
                     // Politica ENI: export da PROD richiede conferma se non è un backup schedulato
                     if (env.SRC_DB_ENV == 'PROD' && params.OPERATION != 'BACKUP') {
-                        input message: """
+                        timeout(time: 30, unit: 'MINUTES') {
+                            input message: """
 ⚠️  ATTENZIONE: Operazione di EXPORT da ambiente PRODUZIONE (${params.SOURCE_DB}).
 Questo potrebbe impattare le performance del database.
 Confermi di voler procedere?""",
-                              ok: 'Confermo Export da PROD',
-                              submitter: 'dba-admin,dba-lead'
+                                  ok: 'Confermo Export da PROD',
+                                  submitter: 'dba-admin,dba-lead'
+                        }
                     }
 
                     if (params.DRY_RUN) {
@@ -775,7 +782,8 @@ Confermi di voler procedere?""",
                     // --- Approvazione manuale per import su PROD ---
                     // Politica ENI: import su PROD richiede doppia conferma
                     if (env.TGT_DB_ENV == 'PROD') {
-                        input message: """
+                        timeout(time: 30, unit: 'MINUTES') {
+                            input message: """
 🔴  ATTENZIONE CRITICA: Operazione di IMPORT su database di PRODUZIONE!
     Target: ${params.TARGET_DB}
     Schema: ${params.SCHEMA_NAME}
@@ -783,8 +791,9 @@ Confermi di voler procedere?""",
 
 Questa operazione MODIFICHERÀ dati in produzione.
 Sei assolutamente sicuro di voler procedere?""",
-                              ok: 'CONFERMO IMPORT SU PROD',
-                              submitter: 'dba-admin,dba-lead'
+                                  ok: 'CONFERMO IMPORT SU PROD',
+                                  submitter: 'dba-admin,dba-lead'
+                        }
                     }
 
                     if (params.DRY_RUN) {
@@ -1124,13 +1133,17 @@ e lo schema nuovo prenderà il nome di produzione.""",
                     echo "│ Tabella            │ Sorgente     │ Target       │ Stato      │"
                     echo "├────────────────────┼──────────────┼──────────────┼────────────┤"
 
-                    verificationResults.sourceRecords?.each { tableName, srcCount ->
-                        def tgtCount = verificationResults.targetRecords?.get(tableName) ?: 0
-                        def status = (srcCount == tgtCount) ? '✓ OK' : '✗ DIFF'
-                        if (srcCount != tgtCount) {
-                            discrepancies << [table: tableName, source: srcCount, target: tgtCount]
+                    if (verificationResults.sourceRecords) {
+                        for (def entry : verificationResults.sourceRecords.entrySet()) {
+                            def tableName = entry.key
+                            def srcCount = entry.value
+                            def tgtCount = verificationResults.targetRecords?.get(tableName) ?: 0
+                            def status = (srcCount == tgtCount) ? '✓ OK' : '✗ DIFF'
+                            if (srcCount != tgtCount) {
+                                discrepancies << [table: tableName, source: srcCount, target: tgtCount]
+                            }
+                            echo "│ ${tableName.padRight(18)} │ ${srcCount.toString().padRight(12)} │ ${tgtCount.toString().padRight(12)} │ ${status.padRight(10)} │"
                         }
-                        echo "│ ${tableName.padRight(18)} │ ${srcCount.toString().padRight(12)} │ ${tgtCount.toString().padRight(12)} │ ${status.padRight(10)} │"
                     }
                     echo "└────────────────────┴──────────────┴──────────────┴────────────┘"
 

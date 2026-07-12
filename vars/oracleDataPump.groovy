@@ -275,7 +275,7 @@ BEGIN
     DBMS_DATAPUMP.DATA_FILTER(
         handle      => v_handle,
         name        => 'SUBQUERY',
-        value       => '${options.queryFilter}',
+        value       => '${options.queryFilter.replace("'", "''")}',
         schema_name => '${schema}'
     );
 """
