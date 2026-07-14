@@ -55,14 +55,18 @@ Dopo il primo accesso, vai in **Manage Jenkins → Plugins → Available plugins
 
 ---
 
-## 🔧 STEP 3: Installare Oracle Database (2 Opzioni)
+## 🔧 STEP 3: Installare Oracle Database
 
-### Opzione A: Oracle 23ai Free (Installazione Diretta su Windows) ⭐ Consigliata
+In aziende come ENI il parco database è misto: **Oracle 19c** (la versione Long Term Support
+più diffusa in produzione) e **Oracle 23ai** (la versione più recente). Per testare la pipeline
+su entrambe le versioni, installa almeno una delle due — idealmente entrambe.
 
-Oracle 23ai Free è la versione gratuita di Oracle, con limiti generosi per lo sviluppo:
-- Fino a 12 GB di dati utente
-- Fino a 2 GB di RAM
+### Opzione A: Oracle 23ai Free (Installazione Diretta su Windows)
+
+Oracle 23ai Free è la versione gratuita più recente:
+- Fino a 12 GB di dati utente, 2 GB di RAM
 - Data Pump completamente funzionante
+- Supporta tutte le feature nuove (JSON Duality, AI Vector Search, ecc.)
 
 1. Vai su: https://www.oracle.com/database/free/
 2. Scarica **Oracle Database 23ai Free** per Windows (richiede account Oracle gratuito)
@@ -74,24 +78,82 @@ Oracle 23ai Free è la versione gratuita di Oracle, con limiti generosi per lo s
    # Se vedi "Connected to: Oracle Database 23ai Free" → funziona!
    ```
 
-### Opzione B: Oracle XE via Docker (Più Veloce) 🐳
+### Opzione B: Oracle 19c XE (Express Edition) ⭐ Fondamentale per compatibilità ENI
 
-Se hai Docker Desktop installato (gratuito per uso personale/dev):
+Oracle 19c è la versione che troverai sui database PROD di ENI. Testare anche su 19c
+ti garantisce che la pipeline non usi feature disponibili solo su 23ai.
+
+**Installazione diretta su Windows:**
+1. Vai su: https://www.oracle.com/database/technologies/xe-downloads.html
+2. Scarica **Oracle Database 19c XE** per Windows (`.exe`, ~1.5 GB)
+3. Esegui l'installer
+4. Porta di default: **1522** (se hai già 23ai su 1521) oppure **1521**
+5. Ricorda la password che imposti per SYS/SYSTEM
+6. Verifica:
+   ```powershell
+   sqlplus sys/TuaPassword@localhost:1521/XEPDB1 as sysdba
+   # Se vedi "Connected to: Oracle Database 19c Express Edition" → funziona!
+   ```
+
+> ⚠️ **Se installi sia 23ai che 19c sullo stesso PC**, usa porte diverse (es. 1521 per 23ai, 1522 per 19c)
+> e `ORACLE_HOME` diversi. La variabile `TNS_ADMIN` può puntare a un unico `tnsnames.ora`
+> con entrambi i servizi.
+
+### Opzione C: Docker (Entrambe le Versioni in Parallelo) 🐳 Consigliata
+
+Docker è il modo più comodo per avere entrambe le versioni contemporaneamente
+senza conflitti di porte o `ORACLE_HOME`:
 
 ```powershell
-# Scarica e avvia Oracle 23ai Free in un container
-docker run -d --name oracle-free `
+# --- Oracle 23ai Free (porta 1521) ---
+docker run -d --name oracle-23ai `
   -p 1521:1521 -p 5500:5500 `
   -e ORACLE_PWD=OracleTest123 `
   container-registry.oracle.com/database/free:latest
 
-# Attendi 2-3 minuti che il database si avvii, poi verifica:
-docker logs -f oracle-free
+# --- Oracle 19c XE (porta 1522) ---
+docker run -d --name oracle-19c `
+  -p 1522:1521 -p 5501:5500 `
+  -e ORACLE_PWD=OracleTest123 `
+  container-registry.oracle.com/database/express:21.3.0-xe
+  # Nota: l'immagine ufficiale Oracle XE su container registry è 21c.
+  # Per 19c puro, usa l'immagine della community:
+  # gvenzl/oracle-xe:19-slim
+
+# Alternativa per 19c reale:
+docker run -d --name oracle-19c `
+  -p 1522:1521 `
+  -e ORACLE_PWD=OracleTest123 `
+  gvenzl/oracle-xe:19-slim
+
+# Attendi 2-3 minuti per ogni container, poi verifica:
+docker logs -f oracle-23ai
+docker logs -f oracle-19c
 # Quando vedi "DATABASE IS READY TO USE!" → è pronto
 
-# Connettiti:
+# Connessione 23ai:
 sqlplus sys/OracleTest123@localhost:1521/FREEPDB1 as sysdba
+
+# Connessione 19c:
+sqlplus sys/OracleTest123@localhost:1522/XEPDB1 as sysdba
 ```
+
+### Differenze Chiave tra 19c e 23ai per Data Pump
+
+| Feature | Oracle 19c | Oracle 23ai |
+|---|---|---|
+| `DBMS_DATAPUMP` | ✅ Completo | ✅ Completo |
+| `DBMS_CLOUD` (Autonomous) | ✅ Disponibile su ATP/ADW | ✅ Disponibile |
+| `DBMS_DATAPUMP.KU$_FILE_TYPE_*` | ✅ Costanti standard | ✅ Identiche |
+| `job_name` max length | 30 caratteri | 128 caratteri |
+| `VERSION` parameter | Fino a `19.0` | Fino a `23.0` |
+| Compressione `ALL` | Richiede licenza Advanced | Richiede licenza Advanced |
+| `DATA_PUMP_DIR` default | `/u01/app/oracle/admin/XE/dpdump/` | Simile, varia |
+
+> **Importante**: Quando esporti da 23ai e importi su 19c, devi usare `VERSION=19.0`
+> nel `DBMS_DATAPUMP.OPEN()` per evitare incompatibilità. La pipeline gestisce già
+> questo caso nel parametro `version => 'COMPATIBLE'`.
+
 
 ---
 
