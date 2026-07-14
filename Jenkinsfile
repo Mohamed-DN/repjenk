@@ -154,8 +154,8 @@ pipeline {
         )
         choice(
             name: 'TABLE_EXISTS_ACTION',
-            choices: ['SKIP', 'REPLACE', 'APPEND', 'TRUNCATE'],
-            description: 'Azione se la tabella esiste già nel target.'
+            choices: ['SKIP', 'REPLACE', 'APPEND', 'TRUNCATE', 'SAFE_SWAP'],
+            description: 'Azione se la tabella esiste già nel target (SAFE_SWAP per zero downtime).'
         )
 
         // --- Opzioni per nuovo schema e swap ---
@@ -901,9 +901,29 @@ Sei assolutamente sicuro di voler procedere?""",
                                 def parts = params.REMAP_TABLESPACE.split(':')
                                 options.remapTablespace = [from: parts[0].trim(), to: parts[1].trim()]
                             }
-                            if (params.REMAP_TABLE?.trim() && params.REMAP_TABLE.contains(':')) {
-                                def parts = params.REMAP_TABLE.split(':')
-                                options.remapTable = [from: parts[0].trim(), to: parts[1].trim()]
+                            if (params.REMAP_TABLE?.trim()) {
+                                options.remapTable = params.REMAP_TABLE.split(',').collect { pair ->
+                                    def parts = pair.split(':')
+                                    [from: parts[0].trim(), to: parts[1].trim()]
+                                }
+                            }
+
+                            // --- Logica SAFE_SWAP (Zero Downtime) ---
+                            def swapTables = []
+                            def bkpSuffix = "_BKP_${new Date().format('yyyyMMdd')}"
+                            if (params.TABLE_EXISTS_ACTION == 'SAFE_SWAP') {
+                                if (!options.tables || options.tables.isEmpty()) {
+                                    error "[ERRORE] L'opzione SAFE_SWAP richiede che TABLE_LIST sia valorizzato con le tabelle da aggiornare."
+                                }
+                                options.tableExistsAction = 'REPLACE'
+                                options.remapTable = options.remapTable ?: []
+                                
+                                options.tables.each { tableName ->
+                                    def tempName = "${tableName}_JENK".take(30) // Max 30 char (Oracle 12.1 limit per sicurezza)
+                                    options.remapTable << [from: tableName, to: tempName]
+                                    swapTables << [live: tableName, temp: tempName, bkp: "${tableName}${bkpSuffix}".take(30)]
+                                }
+                                echo "[INFO] SAFE_SWAP Attivato. Le tabelle saranno importate temporaneamente come _JENK e swappate."
                             }
 
                             if (env.TGT_DB_TYPE == 'autonomous') {
@@ -924,6 +944,31 @@ Sei assolutamente sicuro di voler procedere?""",
                             env.IMPORT_RECORD_COUNT = importResult.recordCount?.toString() ?: '0'
 
                             echo "\u001B[32m[✓] Import completato con successo in ${importDuration}s — Record importati: ${env.IMPORT_RECORD_COUNT}\u001B[0m"
+
+                            // --- Esecuzione SQL Post-Import per SAFE_SWAP ---
+                            if (params.TABLE_EXISTS_ACTION == 'SAFE_SWAP' && !swapTables.isEmpty()) {
+                                echo "\u001B[36m[INFO] Esecuzione SAFE_SWAP: scambio tabelle temporanee con quelle live...\u001B[0m"
+                                def swapSql = "BEGIN\n"
+                                
+                                // Step 1: Genera i LOCK
+                                swapTables.each { t ->
+                                    swapSql += "  EXECUTE IMMEDIATE 'LOCK TABLE ${t.live} IN EXCLUSIVE MODE';\n"
+                                    swapSql += "  EXECUTE IMMEDIATE 'LOCK TABLE ${t.temp} IN EXCLUSIVE MODE';\n"
+                                }
+                                
+                                // Step 2: Genera i RENAME
+                                swapTables.each { t ->
+                                    // Gestisce caso in cui BKP esista già (es. da una run precedente)
+                                    swapSql += "  BEGIN EXECUTE IMMEDIATE 'DROP TABLE ${t.bkp} CASCADE CONSTRAINTS'; EXCEPTION WHEN OTHERS THEN NULL; END;\n"
+                                    swapSql += "  EXECUTE IMMEDIATE 'RENAME ${t.live} TO ${t.bkp}';\n"
+                                    swapSql += "  EXECUTE IMMEDIATE 'RENAME ${t.temp} TO ${t.live}';\n"
+                                }
+                                
+                                swapSql += "  COMMIT;\nEND;\n/"
+                                
+                                oracleConnect.runSqlStatement(dbConfig, swapSql)
+                                echo "\u001B[32m[✓] SAFE_SWAP completato! Le vecchie tabelle sono state salvate con suffisso ${bkpSuffix}\u001B[0m"
+                            }
 
                         } catch (Exception e) {
                             archiveArtifacts artifacts: "${LOG_DIR}/*_imp.log", allowEmptyArchive: true

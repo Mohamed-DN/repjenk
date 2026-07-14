@@ -470,15 +470,18 @@ BEGIN
 
     // Remap singola tabella se necessario
     if (options.remapTable) {
-        plsqlBlock += """
-    -- Remapping nome tabella
+        def remaps = options.remapTable instanceof List ? options.remapTable : [options.remapTable]
+        remaps.each { remap ->
+            plsqlBlock += """
+    -- Remapping tabella
     DBMS_DATAPUMP.METADATA_REMAP(
         handle    => v_handle,
         name      => 'REMAP_TABLE',
-        old_value => '${options.remapTable.from.replace("'", "''")}',
-        value     => '${options.remapTable.to.replace("'", "''")}'
+        old_value => '${remap.from.replace("'", "''")}',
+        value     => '${remap.to.replace("'", "''")}'
     );
 """
+        }
     }
 
     // Filtro tabelle specifiche per import selettivo
@@ -823,7 +826,10 @@ def buildImpdpCommand(Map dbConfig, String schema, Map options) {
 
     // Remap tabella
     if (options.remapTable) {
-        cmd.append(" REMAP_TABLE=${options.remapTable.from}:${options.remapTable.to}")
+        def remaps = options.remapTable instanceof List ? options.remapTable : [options.remapTable]
+        remaps.each { remap ->
+            cmd.append(" REMAP_TABLE=${remap.from}:${remap.to}")
+        }
     }
 
     // Grado di parallelismo
