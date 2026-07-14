@@ -148,12 +148,12 @@ def cliExport(Map dbConfig, String schema, Map options = [:]) {
     // Verifica che il file dump sia stato creato
     def dumpDir = options.dumpDir ?: '/u01/app/oracle/datapump'
     def dumpFile = "${dumpDir}/${options.dumpFilename}"
-    def fileCheck = sh(script: "ls -la ${dumpFile}", returnStatus: true)
+    def fileCheck = sh(script: "ls -la \"${dumpFile}\"", returnStatus: true)
     if (fileCheck != 0) {
         echo "[DataPump/CLI] ⚠ Attenzione: file dump non trovato in ${dumpFile}"
     } else {
         // Recupero dimensione file
-        result.fileSize = sh(script: "stat -c%s ${dumpFile} 2>/dev/null || stat -f%z ${dumpFile} 2>/dev/null", returnStdout: true).trim()
+        result.fileSize = sh(script: "stat -c%s \"${dumpFile}\" 2>/dev/null || stat -f%z \"${dumpFile}\" 2>/dev/null", returnStdout: true).trim()
         echo "[DataPump/CLI] File dump creato: ${dumpFile} (${result.fileSize} bytes)"
     }
 
@@ -256,7 +256,8 @@ BEGIN
 
     // Esclusione tabelle se specificato
     if (options.excludeTables) {
-        def excludeList = options.excludeTables.collect { "'${it.toUpperCase().replace("'", "''")}'" }.join(',')
+        def excludeTablesList = options.excludeTables instanceof String ? options.excludeTables.split(',').collect{it.trim()} : options.excludeTables
+        def excludeList = excludeTablesList.collect { "'${it.toUpperCase().replace("'", "''")}'" }.join(',')
         plsqlBlock += """
     -- Esclusione tabelle non desiderate
     DBMS_DATAPUMP.METADATA_FILTER(
@@ -749,7 +750,8 @@ def buildExpdpCommand(Map dbConfig, String schema, Map options) {
 
     // Filtro tabelle da escludere
     if (options.excludeTables) {
-        for (def table in options.excludeTables) {
+        def excludeTablesList = options.excludeTables instanceof String ? options.excludeTables.split(',').collect{it.trim()} : options.excludeTables
+        for (def table in excludeTablesList) {
             cmd.append(" EXCLUDE=TABLE:\"IN ('${table.toUpperCase()}')\"")
         }
     }

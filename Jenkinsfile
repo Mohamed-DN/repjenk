@@ -426,8 +426,13 @@ Impostare CONFIRM_DESTRUCTIVE = true per procedere.
 Questa misura è obbligatoria per la policy di sicurezza ENI."""
                     }
 
-                    // --- Validazione formati e caratteri per prevenzione SQL Injection ---
-                    def identifierRegex = /^[a-zA-Z0-9_\\\$#:\.,]*$/
+                    // --- Validazione formati e caratteri per prevenzione SQL/OS Injection ---
+                    def filenameRegex = /^[a-zA-Z0-9_.-]+$/
+                    if (params.DUMP_FILENAME?.trim() && !(params.DUMP_FILENAME ==~ filenameRegex)) {
+                        errors << "Il parametro DUMP_FILENAME contiene caratteri non validi."
+                    }
+
+                    def identifierRegex = /^[a-zA-Z0-9_\$#:\.,]*$/
                     def paramsToValidate = [
                         'SCHEMA_NAME': params.SCHEMA_NAME,
                         'REMAP_SCHEMA': params.REMAP_SCHEMA,
@@ -438,20 +443,14 @@ Questa misura è obbligatoria per la policy di sicurezza ENI."""
                     ]
 
                     for (def entry in paramsToValidate.entrySet()) {
-                        def paramName = entry.key
-                        def paramValue = entry.value
-                        if (paramValue?.trim() && !(paramValue ==~ identifierRegex)) {
-                            errors << "Il parametro ${paramName} contiene caratteri non validi. Sono consentiti solo alfanumerici, underscore e [\$#:,.]"
+                        if (entry.value?.trim() && !(entry.value ==~ identifierRegex)) {
+                            errors << "Il parametro ${entry.key} contiene caratteri non validi."
                         }
                     }
 
-                    // --- Validazione formato REMAP_TABLE ---
                     if (params.REMAP_TABLE?.trim()) {
-                        def pairs = params.REMAP_TABLE.split(',')
-                        for (def pair in pairs) {
-                            if (!pair.trim().contains(':')) {
-                                errors << "Formato REMAP_TABLE non valido: '${pair}'. Formato atteso: OLD_TABLE:NEW_TABLE"
-                            }
+                        for (def pair in params.REMAP_TABLE.split(',')) {
+                            if (!pair.trim().contains(':')) errors << "Formato REMAP_TABLE non valido: '${pair}'"
                         }
                     }
 
@@ -460,18 +459,11 @@ Questa misura è obbligatoria per la policy di sicurezza ENI."""
                         errors << "BUCKET_NAME è obbligatorio per operazioni cross-database (${params.OPERATION})"
                     }
 
-                    // --- Validazione QUERY_FILTER: prevenzione SQL injection basilare ---
+                    // --- Validazione QUERY_FILTER: prevenzione SQL injection ---
                     if (params.QUERY_FILTER?.trim()) {
-                        def forbiddenPattern = ~/(?i)\b(DROP|DELETE|TRUNCATE)\b/
-                        def matcher = forbiddenPattern.matcher(params.QUERY_FILTER)
-                        if (matcher.find()) {
-                            errors << "QUERY_FILTER contiene keyword proibito: '${matcher.group(1).toUpperCase()}'"
-                        }
-                        def forbidden = ['ALTER ', 'CREATE ', 'INSERT ', 'UPDATE ', '--', '/*', '||', 'CHR(', ';', 'DBMS_']
-                        for (def keyword in forbidden) {
-                            if (params.QUERY_FILTER.toUpperCase().contains(keyword)) {
-                                errors << "QUERY_FILTER contiene keyword proibito: '${keyword.trim()}'"
-                            }
+                        def strictPattern = ~/(?i)(\b(DROP|DELETE|TRUNCATE|ALTER|CREATE|INSERT|UPDATE)\b|DBMS_[A-Z_]+|CHR\s*\()|(--|\/\*|\|\||;)/
+                        if (strictPattern.matcher(params.QUERY_FILTER).find()) {
+                            errors << "QUERY_FILTER contiene elementi proibiti o potenziale SQL injection"
                         }
                     }
 
@@ -718,52 +710,44 @@ Confermi di voler procedere?""",
                             // --- Discriminazione tipo database: Autonomous vs DBCS ---
                             // Autonomous DB usa DBMS_DATAPUMP via PL/SQL (non ha accesso CLI)
                             // DBCS usa il classico expdp da riga di comando
+                            def dbConfig = [
+                                dbType: env.SRC_DB_TYPE,
+                                connectionString: env.SRC_DB_CONNECT_STR,
+                                credentialId: env.SRC_CRED_ID,
+                                host: env.SRC_DB_HOST,
+                                port: env.SRC_DB_PORT,
+                                serviceName: env.SRC_DB_SERVICE
+                            ]
+                            def options = [
+                                dumpFilename:   env.EFFECTIVE_DUMP_FILENAME,
+                                logFilename:    env.EFFECTIVE_LOG_FILENAME,
+                                parallel:       params.PARALLEL.toInteger(),
+                                content:        params.CONTENT,
+                                includeGrants:  params.INCLUDE_GRANTS,
+                                includeStatistics: params.INCLUDE_STATISTICS,
+                                tables:         params.TABLE_LIST ? params.TABLE_LIST.split(',').collect{it.trim()} : null,
+                                excludeTables:  params.EXCLUDE_TABLES ? params.EXCLUDE_TABLES.split(',').collect{it.trim()} : null,
+                                queryFilter:    params.QUERY_FILTER,
+                                compression:    params.COMPRESSION,
+                                encryption:     params.ENCRYPTION,
+                                bucketName:     params.BUCKET_NAME,
+                                dumpDir:        env.DUMP_DIR,
+                                walletDir:      env.ADB_WALLET_DIR,
+                                oracleHome:     env.ORACLE_HOME,
+                                maskingRules:   params.MASKING_RULES
+                            ]
+
                             if (env.SRC_DB_TYPE == 'autonomous') {
                                 echo "[INFO] Database Autonomous rilevato — utilizzo DBMS_DATAPUMP via PL/SQL"
-                                exportResult = oracleDataPump.exportAutonomous(
-                                    connectString:  env.SRC_DB_CONNECT_STR,
-                                    user:           DB_USER,
-                                    password:       DB_PASS,
-                                    walletDir:      env.ADB_WALLET_DIR,
-                                    schemaName:     params.SCHEMA_NAME,
-                                    dumpFileName:   env.EFFECTIVE_DUMP_FILENAME,
-                                    logFileName:    env.EFFECTIVE_LOG_FILENAME,
-                                    parallel:       params.PARALLEL.toInteger(),
-                                    content:        params.CONTENT,
-                                    includeGrants:  params.INCLUDE_GRANTS,
-                                    includeStats:   params.INCLUDE_STATISTICS,
-                                    tableList:      params.TABLE_LIST,
-                                    excludeTables:  params.EXCLUDE_TABLES,
-                                    queryFilter:    params.QUERY_FILTER,
-                                    compression:    params.COMPRESSION,
-                                    encryption:     params.ENCRYPTION
-                                )
+                                exportResult = oracleDataPump.autonomousExport(dbConfig, params.SCHEMA_NAME, options)
                             } else {
                                 echo "[INFO] Database DBCS rilevato — utilizzo expdp CLI"
-                                exportResult = oracleDataPump.exportDBCS(
-                                    connectString:  env.SRC_DB_CONNECT_STR,
-                                    user:           DB_USER,
-                                    password:       DB_PASS,
-                                    oracleHome:     env.ORACLE_HOME,
-                                    schemaName:     params.SCHEMA_NAME,
-                                    dumpDir:        env.DUMP_DIR,
-                                    dumpFileName:   env.EFFECTIVE_DUMP_FILENAME,
-                                    logFileName:    env.EFFECTIVE_LOG_FILENAME,
-                                    parallel:       params.PARALLEL.toInteger(),
-                                    content:        params.CONTENT,
-                                    includeGrants:  params.INCLUDE_GRANTS,
-                                    includeStats:   params.INCLUDE_STATISTICS,
-                                    tableList:      params.TABLE_LIST,
-                                    excludeTables:  params.EXCLUDE_TABLES,
-                                    queryFilter:    params.QUERY_FILTER,
-                                    compression:    params.COMPRESSION,
-                                    encryption:     params.ENCRYPTION
-                                )
+                                exportResult = oracleDataPump.cliExport(dbConfig, params.SCHEMA_NAME, options)
                             }
 
                             // --- Verifica risultato export ---
-                            if (!exportResult.success) {
-                                error "[ERRORE] Export fallito: ${exportResult.error}"
+                            if (exportResult.status != 'SUCCESS') {
+                                error "[ERRORE] Export fallito: ${exportResult.error ?: 'Errore sconosciuto'}"
                             }
 
                             env.EXPORT_DUMP_SIZE = exportResult.dumpSizeMB?.toString() ?: '0'
@@ -885,48 +869,52 @@ Sei assolutamente sicuro di voler procedere?""",
                             def importResult
 
                             // --- Discriminazione tipo database target ---
+                            def dbConfig = [
+                                dbType: env.TGT_DB_TYPE,
+                                connectionString: env.TGT_DB_CONNECT_STR,
+                                credentialId: env.TGT_CRED_ID,
+                                host: env.TGT_DB_HOST,
+                                port: env.TGT_DB_PORT,
+                                serviceName: env.TGT_DB_SERVICE
+                            ]
+                            def options = [
+                                dumpFilename:       env.EFFECTIVE_DUMP_FILENAME,
+                                logFilename:        env.EFFECTIVE_LOG_FILENAME.replace('.log', '_imp.log'),
+                                parallel:           params.PARALLEL.toInteger(),
+                                content:            params.CONTENT,
+                                tableExistsAction:  params.TABLE_EXISTS_ACTION,
+                                includeGrants:      params.INCLUDE_GRANTS,
+                                includeStatistics:  params.INCLUDE_STATISTICS,
+                                tables:             params.TABLE_LIST ? params.TABLE_LIST.split(',').collect{it.trim()} : null,
+                                dumpDir:            env.DUMP_DIR,
+                                walletDir:          env.ADB_WALLET_DIR,
+                                oracleHome:         env.ORACLE_HOME,
+                                maskingRules:       params.MASKING_RULES
+                            ]
+
+                            if (params.CREATE_NEW_SCHEMA || params.REMAP_SCHEMA?.trim()) {
+                                options.remapSchema = [from: params.SCHEMA_NAME, to: env.EFFECTIVE_TARGET_SCHEMA]
+                            }
+                            if (params.REMAP_TABLESPACE?.trim() && params.REMAP_TABLESPACE.contains(':')) {
+                                def parts = params.REMAP_TABLESPACE.split(':')
+                                options.remapTablespace = [from: parts[0].trim(), to: parts[1].trim()]
+                            }
+                            if (params.REMAP_TABLE?.trim() && params.REMAP_TABLE.contains(':')) {
+                                def parts = params.REMAP_TABLE.split(':')
+                                options.remapTable = [from: parts[0].trim(), to: parts[1].trim()]
+                            }
+
                             if (env.TGT_DB_TYPE == 'autonomous') {
                                 echo "[INFO] Database Autonomous rilevato — utilizzo DBMS_DATAPUMP via PL/SQL"
-                                importResult = oracleDataPump.importAutonomous(
-                                    connectString:      env.TGT_DB_CONNECT_STR,
-                                    user:               DB_USER,
-                                    password:           DB_PASS,
-                                    walletDir:          env.ADB_WALLET_DIR,
-                                    schemaName:         params.SCHEMA_NAME,
-                                    dumpFileName:       env.EFFECTIVE_DUMP_FILENAME,
-                                    logFileName:        env.EFFECTIVE_LOG_FILENAME.replace('.log', '_imp.log'),
-                                    parallel:           params.PARALLEL.toInteger(),
-                                    content:            params.CONTENT,
-                                    tableExistsAction:  params.TABLE_EXISTS_ACTION,
-                                    remapOptions:       remapOptions,
-                                    includeGrants:      params.INCLUDE_GRANTS,
-                                    includeStats:       params.INCLUDE_STATISTICS,
-                                    tableList:          params.TABLE_LIST
-                                )
+                                importResult = oracleDataPump.autonomousImport(dbConfig, params.SCHEMA_NAME, options)
                             } else {
                                 echo "[INFO] Database DBCS rilevato — utilizzo impdp CLI"
-                                importResult = oracleDataPump.importDBCS(
-                                    connectString:      env.TGT_DB_CONNECT_STR,
-                                    user:               DB_USER,
-                                    password:           DB_PASS,
-                                    oracleHome:         env.ORACLE_HOME,
-                                    schemaName:         params.SCHEMA_NAME,
-                                    dumpDir:            env.DUMP_DIR,
-                                    dumpFileName:       env.EFFECTIVE_DUMP_FILENAME,
-                                    logFileName:        env.EFFECTIVE_LOG_FILENAME.replace('.log', '_imp.log'),
-                                    parallel:           params.PARALLEL.toInteger(),
-                                    content:            params.CONTENT,
-                                    tableExistsAction:  params.TABLE_EXISTS_ACTION,
-                                    remapOptions:       remapOptions,
-                                    includeGrants:      params.INCLUDE_GRANTS,
-                                    includeStats:       params.INCLUDE_STATISTICS,
-                                    tableList:          params.TABLE_LIST
-                                )
+                                importResult = oracleDataPump.cliImport(dbConfig, params.SCHEMA_NAME, options)
                             }
 
                             // --- Verifica risultato import ---
-                            if (!importResult.success) {
-                                error "[ERRORE] Import fallito: ${importResult.error}"
+                            if (importResult.status != 'SUCCESS') {
+                                error "[ERRORE] Import fallito: ${importResult.error ?: 'Errore sconosciuto'}"
                             }
 
                             def importDuration = (System.currentTimeMillis() - importStartTime) / 1000

@@ -124,4 +124,108 @@ In questo modo:
 - **Credentials**: Le password nascoste.
 - **Shared Library**: Il codice complesso riutilizzabile spostato altrove (es. la cartella `vars/`).
 
+---
+
+## 8. I File di Configurazione (`config/`)
+
+La pipeline non ha valori "bruciati" dentro il codice. Tutto è configurabile tramite due file YAML nella cartella `config/`:
+
+### `databases.yaml` — Il Registro dei Database
+Questo file è l'elenco telefonico di tutti i database Oracle che la pipeline può raggiungere. Per ogni database vedrai:
+- **`type`**: Se è `autonomous` (ATP/ADW, gestito via PL/SQL) o `dbcs` (DBCS/VM, gestito via CLI `expdp`/`impdp`).
+- **`environment`**: `PROD`, `UAT`, `DEV` o `DR`. Se è `PROD`, la pipeline attiverà protezioni extra (conferma manuale, ecc.).
+- **`service_name`**: La connection string Oracle.
+- **`db_credential_id`**: Il riferimento alla cassaforte Jenkins per la password di quel database.
+- **`schemas_allowed`**: Una whitelist. Solo gli schemi elencati qui possono essere esportati/importati (su PROD).
+
+**Esempio pratico**: Quando scrivi `PROD_ATP_CORE` nel campo "SOURCE_DB" su Jenkins, la pipeline va a leggere `databases.yaml`, trova la sezione `PROD_ATP_CORE`, e da lì recupera il tipo di database, la regione OCI, il bucket di destinazione e le credenziali da usare.
+
+### `defaults.yaml` — I Valori Predefiniti
+Contiene i default per *tutte* le operazioni. Se non specifichi un valore in Jenkins, la pipeline userà questi. Include:
+- **`export.parallel`**: Il grado di parallelismo di default (4).
+- **`import.table_exists_action`**: Cosa fare se la tabella esiste già (`SKIP`).
+- **`security.require_confirmation_for_prod`**: Se chiedere la conferma manuale per operazioni su PROD (`true`).
+- **`environment_overrides`**: Sovrascritture per ambiente. Ad esempio, su `PROD` il timeout diventa 12 ore e la compressione è `ALL`, mentre su `DEV` si usa `REPLACE` e nessuna compressione.
+
+---
+
+## 9. Flussi Operativi Comuni (Cosa Succede Quando...)
+
+### Flusso A: Export semplice
+```
+Tu clicchi "Build" con OPERATION=EXPORT, SOURCE_DB=PROD_ATP_CORE, SCHEMA_NAME=ENI_CORE
+   │
+   ├─ Stage 1: Initialize → Legge databases.yaml, trova PROD_ATP_CORE, scopre che è "autonomous"
+   ├─ Stage 2: Validate → Controlla che tutti i campi siano compilati correttamente
+   ├─ Stage 3: Health Check → Prova a connettersi al database per verificare che sia acceso
+   ├─ Stage 5: Export → Poiché è autonomous, chiama oracleDataPump.autonomousExport()
+   │           └─ Genera blocco PL/SQL con DBMS_DATAPUMP.OPEN → ADD_FILE → START_JOB
+   │           └─ Monitora il job ogni 30 secondi fino al completamento
+   ├─ (Upload su bucket OCI se specificato)
+   └─ Post: Invia email di successo con report HTML
+```
+
+### Flusso B: Refresh ambiente (PROD → DEV)
+```
+OPERATION=REFRESH_ENV, SOURCE_DB=PROD_ATP_CORE, TARGET_DB=DEV_ATP_01, SCHEMA_NAME=ENI_CORE
+   │
+   ├─ Initialize → Carica config per entrambi i database
+   ├─ Validate → Verifica CONFIRM_DESTRUCTIVE=true (obbligatorio su PROD)
+   ├─ Health Check → Testa connettività a ENTRAMBI i database
+   ├─ Export → Esporta da PROD (con approvazione manuale)
+   ├─ Upload su bucket → Trasferisce il dump file
+   ├─ Import → Importa su DEV con remap schema e ENABLE_DATA_MASKING
+   ├─ Post-Verification → Confronta conteggio record sorgente vs target
+   └─ Notifica → Report con confronto dettagliato
+```
+
+### Flusso C: Swap and Drop (Aggiornamento zero-downtime)
+```
+OPERATION=SWAP_AND_DROP, TARGET_DB=PROD_DBCS_ERP, SCHEMA_NAME=ENI_ERP
+   │
+   ├─ Prerequisiti: Lo schema ENI_ERP_NEW deve già esistere (creato da un import precedente)
+   ├─ Approve → Doppia conferma manuale (solo PROD)
+   ├─ Swap → Rinomina ENI_ERP → ENI_ERP_BKP_20260714
+   │       → Rinomina ENI_ERP_NEW → ENI_ERP
+   ├─ Verify → Controlla che gli oggetti siano validi
+   ├─ (Opzionale) Drop → Elimina ENI_ERP_BKP_20260714 se DROP_OLD_AFTER_SWAP=true
+   └─ Notifica → Report con esito
+```
+
+---
+
+## 10. Troubleshooting: Errori Comuni
+
+| Errore | Cosa Significa | Cosa Fare |
+|---|---|---|
+| `sqlplus: command not found` | Il client Oracle non è installato sul nodo Jenkins | Controllare che `ORACLE_HOME` sia configurato e che `sqlplus` sia nel `PATH` |
+| `ORA-39001: invalid argument` | Un parametro del Data Pump non è valido | Controllare i log del job Data Pump (file `.log` nella DATA_PUMP_DIR) |
+| `ORA-31626: job does not exist` | Il job Data Pump è già terminato o è stato cancellato | Verificare in `DBA_DATAPUMP_JOBS` che non ci siano job orfani |
+| `Timeout waiting for input` | Nessuno ha approvato l'operazione su PROD entro 30 minuti | Rilanciare il job e approvare tempestivamente |
+| `BUCKET_NAME è obbligatorio` | Hai scelto un'operazione cross-database ma non hai specificato il bucket | Compilare il campo BUCKET_NAME nell'interfaccia Jenkins |
+| `QUERY_FILTER contiene elementi proibiti` | Il filtro WHERE contiene parole chiave pericolose (DROP, DELETE, ecc.) | Usare solo clausole WHERE semplici senza comandi DML/DDL |
+
+---
+
+## 11. Risorse Esterne per Approfondire
+
+### Documentazione Ufficiale
+1. [Jenkins User Handbook](https://www.jenkins.io/doc/book/) — La bibbia di Jenkins. Parti dal capitolo "Pipeline".
+2. [Declarative Pipeline Syntax](https://www.jenkins.io/doc/book/pipeline/syntax/) — Riferimento completo per la sintassi del Jenkinsfile.
+3. [Jenkins Shared Libraries](https://www.jenkins.io/doc/book/pipeline/shared-libraries/) — Come funziona la cartella `vars/` che usiamo nel nostro progetto.
+4. [Using Credentials in Jenkins](https://www.jenkins.io/doc/book/using/using-credentials/) — Come gestire password e chiavi in modo sicuro.
+5. [Oracle Data Pump Overview (19c)](https://docs.oracle.com/en/database/oracle/oracle-database/19/sutil/oracle-data-pump-overview.html) — La guida Oracle ufficiale per capire `expdp`/`impdp` e `DBMS_DATAPUMP`.
+6. [Oracle DBMS_DATAPUMP PL/SQL Reference](https://docs.oracle.com/en/database/oracle/oracle-database/19/arpls/DBMS_DATAPUMP.html) — Riferimento API per i blocchi PL/SQL generati dalla nostra libreria.
+7. [OCI CLI Command Reference](https://docs.oracle.com/en-us/iaas/tools/oci-cli/latest/oci_cli_docs/) — Tutti i comandi `oci os object` usati per muovere i dump nel cloud.
+
+### Video Tutorial Consigliati
+- [Jenkins Pipeline Tutorial for Beginners (TechWorld with Nana)](https://www.youtube.com/watch?v=7KCS70sCoK0) — Ottimo per chi parte da zero.
+- [Jenkins Full Course (freeCodeCamp)](https://www.youtube.com/watch?v=FX322RVNGj4) — Corso completo di 4 ore, copre tutto.
+
+### Community
+- [Jenkins Community Forums](https://community.jenkins.io/) — Per fare domande specifiche.
+- [Stack Overflow — tag Jenkins](https://stackoverflow.com/questions/tagged/jenkins) — Per cercare soluzioni a errori specifici.
+
+---
+
 *Adesso sei pronto per navigare il codice del progetto in totale autonomia!*

@@ -20,13 +20,17 @@ Qui troverai cosa fa ogni singola cartella nel repository. È fondamentale capir
 ```text
 eni-oracle-datapump-pipeline/
 │
-├── Jenkinsfile                    # 🧠 IL CERVELLO. È il file principaleletto da Jenkins.
-│                                  # Contiene la dichiarazione dei parametri, gli Stage (Export, Import) 
+├── .gitignore                     # 🚫 Regole per ignorare file (dump, credenziali, file di test).
+│
+├── Jenkinsfile                    # 🧠 IL CERVELLO. È il file principale letto da Jenkins.
+│                                  # Contiene la dichiarazione dei parametri, gli Stage (Export, Import)
 │                                  # e la gestione delle Notifiche. NON contiene logica complessa.
 │
 ├── config/
-│   └── databases.yaml             # ⚙️ CONFIGURAZIONE. L'elenco di tutti i database sorgente e target,
-│                                  # le connection string e se sono ambienti Cloud (Autonomous/DBCS).
+│   ├── databases.yaml             # ⚙️ REGISTRO DATABASE. L'elenco di tutti i database sorgente e target,
+│   │                              # le connection string, il tipo (Autonomous/DBCS) e l'ambiente (PROD/DEV).
+│   └── defaults.yaml              # ⚙️ VALORI PREDEFINITI. Parallelismo, compressione, timeout, retention
+│                                  # e policy di sicurezza. Sovrascrivibili per ambiente (PROD/UAT/DEV).
 │
 ├── vars/                          # 📚 SHARED LIBRARIES. Qui c'è la "magia".
 │   ├── oracleDataPump.groovy      # Logica di costruzione comandi expdp/impdp e blocchi DBMS_DATAPUMP.
@@ -37,12 +41,12 @@ eni-oracle-datapump-pipeline/
 ├── scripts/                       # 🛠️ SCRIPT AUSILIARI (Eseguiti dai groovy in vars/)
 │   ├── sql/                       # Script SQL standard (es. verifica connessione, conteggio record).
 │   │   └── eni_data_masking_pkg.sql # Il package ENI per l'anonimizzazione sicura in Non-Prod.
-│   ├── plsql/                     # Script PL/SQL puri.
-│   └── shell/                     # Script Bash/Linux per eventuali operazioni di sistema (opzionali).
+│   ├── plsql/                     # Script PL/SQL per DBMS_DATAPUMP (export/import/monitor/cleanup).
+│   └── shell/                     # Script Bash per operazioni di sistema (health check, expdp, impdp).
 │
 ├── START_HERE.md                  # 🏁 Questo file.
-├── JENKINS_LEARNING_GUIDE.md      # 🎓 Guida didattica a Jenkins.
-└── README.md                      # 📖 Manuale operativo principale.
+├── JENKINS_LEARNING_GUIDE.md      # 🎓 Guida didattica a Jenkins (flussi operativi, troubleshooting).
+└── README.md                      # 📖 Manuale operativo principale (prerequisiti, setup, matrice ops).
 ```
 
 ## 🚀 I Tre Principi di questo Repo

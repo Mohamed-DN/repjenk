@@ -1,0 +1,49 @@
+# =============================================================================
+# ENI Oracle Data Pump Pipeline — .gitignore
+# =============================================================================
+
+# --- File temporanei di sistema ---
+*.tmp
+*.bak
+*.swp
+*~
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# --- IDE e editor ---
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+.project
+.classpath
+.settings/
+
+# --- File di test e scratch ---
+test*.groovy
+old_*.groovy
+
+# --- Agent e orchestrazione AI ---
+.agents/
+ORIGINAL_REQUEST.md
+PROJECT.md
+
+# --- Oracle dump e log (non tracciare i dati!) ---
+*.dmp
+*.log
+*.sqllog
+
+# --- Build Jenkins ---
+target/
+build/
+out/
+
+# --- Credenziali (MAI committare) ---
+*.pem
+*.key
+*.p12
+*.jks
+wallet/
+*.wallet.zip
