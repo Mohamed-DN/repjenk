@@ -75,8 +75,14 @@ def runSql(Map dbConfig, String sqlFilePath, Map params = [:]) {
     // Esecuzione con gestione sicura delle credenziali
     if (dbConfig.dbType?.toLowerCase() in ['autonomous', 'adb']) {
         // Connessione Autonomous DB con Oracle Wallet
-        output = executeWithWallet(dbConfig, credId, sqlTool) { effectiveConnStr ->
-            def cmd = "${sqlTool} -S '${effectiveConnStr}' @'${sqlFilePath}' ${paramStr}"
+        output = executeWithWallet(dbConfig, credId, sqlTool) { dbUser, dbPass, effectiveConnStr ->
+            def cmd = """
+${sqlTool} -S /nolog <<EOF
+CONNECT "${dbUser}"/"${dbPass}"@"${effectiveConnStr}"
+@"${sqlFilePath}" ${paramStr}
+EXIT;
+EOF
+"""
             return sh(script: cmd, returnStdout: true).trim()
         }
     } else {
@@ -85,8 +91,13 @@ def runSql(Map dbConfig, String sqlFilePath, Map params = [:]) {
                 credentialsId: credId,
                 usernameVariable: 'DB_USER',
                 passwordVariable: 'DB_PASS')]) {
-            def fullConnStr = "${env.DB_USER}/${env.DB_PASS}@${connStr}"
-            def cmd = "${sqlTool} -S '${fullConnStr}' @'${sqlFilePath}' ${paramStr}"
+            def cmd = """
+${sqlTool} -S /nolog <<EOF
+CONNECT "${env.DB_USER}"/"${env.DB_PASS}"@"${connStr}"
+@"${sqlFilePath}" ${paramStr}
+EXIT;
+EOF
+"""
             output = sh(script: cmd, returnStdout: true).trim()
         }
     }
@@ -124,16 +135,29 @@ ${sqlStatement}
 EXIT;
 """
         if (dbConfig.dbType?.toLowerCase() in ['autonomous', 'adb']) {
-            output = executeWithWallet(dbConfig, credId, sqlTool) { effectiveConnStr ->
-                return sh(script: "${sqlTool} -S '${effectiveConnStr}' @'${tmpFile}'", returnStdout: true).trim()
+            output = executeWithWallet(dbConfig, credId, sqlTool) { dbUser, dbPass, effectiveConnStr ->
+                def cmd = """
+${sqlTool} -S /nolog <<EOF
+CONNECT "${dbUser}"/"${dbPass}"@"${effectiveConnStr}"
+@"${tmpFile}"
+EXIT;
+EOF
+"""
+                return sh(script: cmd, returnStdout: true).trim()
             }
         } else {
             withCredentials([usernamePassword(
                     credentialsId: credId,
                     usernameVariable: 'DB_USER',
                     passwordVariable: 'DB_PASS')]) {
-                def fullConnStr = "${env.DB_USER}/${env.DB_PASS}@${connStr}"
-                output = sh(script: "${sqlTool} -S '${fullConnStr}' @'${tmpFile}'", returnStdout: true).trim()
+                def cmd = """
+${sqlTool} -S /nolog <<EOF
+CONNECT "${env.DB_USER}"/"${env.DB_PASS}"@"${connStr}"
+@"${tmpFile}"
+EXIT;
+EOF
+"""
+                output = sh(script: cmd, returnStdout: true).trim()
             }
         }
     } finally {
@@ -179,16 +203,29 @@ EXIT;
         def credId = dbConfig.credentialId ?: 'oracle-db-credentials'
 
         if (dbConfig.dbType?.toLowerCase() in ['autonomous', 'adb']) {
-            output = executeWithWallet(dbConfig, credId, sqlTool) { effectiveConnStr ->
-                return sh(script: "${sqlTool} -S '${effectiveConnStr}' @'${wrapperFile}'", returnStdout: true).trim()
+            output = executeWithWallet(dbConfig, credId, sqlTool) { dbUser, dbPass, effectiveConnStr ->
+                def cmd = """
+${sqlTool} -S /nolog <<EOF
+CONNECT "${dbUser}"/"${dbPass}"@"${effectiveConnStr}"
+@"${wrapperFile}"
+EXIT;
+EOF
+"""
+                return sh(script: cmd, returnStdout: true).trim()
             }
         } else {
             withCredentials([usernamePassword(
                     credentialsId: credId,
                     usernameVariable: 'DB_USER',
                     passwordVariable: 'DB_PASS')]) {
-                def fullConnStr = "${env.DB_USER}/${env.DB_PASS}@${connStr}"
-                output = sh(script: "${sqlTool} -S '${fullConnStr}' @'${wrapperFile}'", returnStdout: true).trim()
+                def cmd = """
+${sqlTool} -S /nolog <<EOF
+CONNECT "${env.DB_USER}"/"${env.DB_PASS}"@"${connStr}"
+@"${wrapperFile}"
+EXIT;
+EOF
+"""
+                output = sh(script: cmd, returnStdout: true).trim()
             }
         }
 
@@ -407,13 +444,14 @@ EXIT;
 // --------------------------------------------------------------------------
 private def executeWithWallet(Map dbConfig, String credId, String sqlTool, Closure sqlAction) {
     def walletCredId = dbConfig.walletCredentialId ?: 'oracle-wallet-zip'
-    def walletDir = "${env.WORKSPACE}/wallet_${System.currentTimeMillis()}"
+    // Estrarre il wallet in /tmp garantisce pulizia OS su reboot ed evita commit nel workspace
+    def walletDir = "/tmp/eni_wallet_${System.currentTimeMillis()}_${UUID.randomUUID().toString().substring(0,8)}"
 
     def output = ''
     try {
         // Estrazione wallet dalle credenziali Jenkins (file zip)
         withCredentials([file(credentialsId: walletCredId, variable: 'WALLET_ZIP')]) {
-            sh(script: "mkdir -p '${walletDir}' && unzip -o '${env.WALLET_ZIP}' -d '${walletDir}'", returnStatus: true)
+            sh(script: "mkdir -p '${walletDir}' && chmod 700 '${walletDir}' && unzip -o '${env.WALLET_ZIP}' -d '${walletDir}'", returnStatus: true)
         }
 
         // Configurazione TNS_ADMIN per puntare alla directory del wallet
@@ -423,8 +461,7 @@ private def executeWithWallet(Map dbConfig, String credId, String sqlTool, Closu
                     usernameVariable: 'DB_USER',
                     passwordVariable: 'DB_PASS')]) {
                 def connStr = buildConnectionString(dbConfig)
-                def fullConnStr = "${env.DB_USER}/${env.DB_PASS}@${connStr}"
-                output = sqlAction.call(fullConnStr)
+                output = sqlAction.call(env.DB_USER, env.DB_PASS, connStr)
             }
         }
     } finally {
@@ -444,8 +481,18 @@ private void checkForOracleErrors(String output, String context) {
 
     // Pattern errori Oracle critici
     def errorPatterns = ['ORA-', 'SP2-', 'PLS-']
-    // Pattern da ignorare (warning non bloccanti)
-    def ignorePatterns = ['ORA-31626', 'ORA-39082']  // Warning comuni non critici di Data Pump
+    // Pattern da ignorare (warning non bloccanti specifici per Oracle Data Pump/Migrazioni)
+    def ignorePatterns = [
+        'ORA-31626', // Job non esiste
+        'ORA-39082', // Oggetto creato con warning di compilazione
+        'ORA-31684', // Object type already exists
+        'ORA-39111', // Dependent object type exists and was skipped
+        'ORA-39151', // Table exists; all dependent metadata and data will be skipped
+        'ORA-39083', // Object type failed to create (spesso per grant mancanti)
+        'ORA-01917', // User or role does not exist
+        'ORA-00959', // Tablespace does not exist
+        'ORA-31685'  // Object type failed due to insufficient privileges
+    ]
 
     for (pattern in errorPatterns) {
         if (output.contains(pattern)) {

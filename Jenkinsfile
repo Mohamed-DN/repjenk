@@ -24,8 +24,7 @@ pipeline {
     options {
         timestamps()
         ansiColor('xterm')
-        timeout(time: 8, unit: 'HOURS')
-        disableConcurrentBuilds(abortPrevious: false)
+        timeout(time: 24, unit: 'HOURS')
         buildDiscarder(logRotator(numToKeepStr: '50', artifactNumToKeepStr: '20'))
         skipDefaultCheckout(true)
     }
@@ -696,8 +695,9 @@ Confermi di voler procedere?""",
                         return
                     }
 
-                    echo "\u001B[36m[INFO] Avvio export dal database ${params.SOURCE_DB}...\u001B[0m"
-                    def exportStartTime = System.currentTimeMillis()
+                    lock(resource: "dp_${params.SOURCE_DB}_${params.SCHEMA_NAME}") {
+                        echo "\u001B[36m[INFO] Avvio export dal database ${params.SOURCE_DB}...\u001B[0m"
+                        def exportStartTime = System.currentTimeMillis()
 
                     withCredentials([usernamePassword(
                         credentialsId: env.SRC_CRED_ID,
@@ -761,7 +761,8 @@ Confermi di voler procedere?""",
                             archiveArtifacts artifacts: "${LOG_DIR}/${env.EFFECTIVE_LOG_FILENAME}", allowEmptyArchive: true
                             throw e
                         }
-                    }
+                    } // Chiude withCredentials
+                    } // Chiude lock
 
                     // --- Upload dump su OCI Object Storage se richiesto ---
                     // Necessario per trasferimento tra database in ambienti diversi
@@ -839,6 +840,7 @@ Sei assolutamente sicuro di voler procedere?""",
                         echo "\u001B[32m[✓] Download completato\u001B[0m"
                     }
 
+                    lock(resource: "dp_${params.TARGET_DB ?: params.SOURCE_DB}_${params.SCHEMA_NAME}") {
                     withCredentials([usernamePassword(
                         credentialsId: env.TGT_CRED_ID,
                         usernameVariable: 'DB_USER',
@@ -927,7 +929,8 @@ Sei assolutamente sicuro di voler procedere?""",
                             archiveArtifacts artifacts: "${LOG_DIR}/*_imp.log", allowEmptyArchive: true
                             throw e
                         }
-                    }
+                    } // Chiude withCredentials
+                    } // Chiude lock
                 }
             }
         }
