@@ -10,6 +10,8 @@ Per comprendere appieno l'automazione, segui esattamente quest'ordine di lettura
 1. **`START_HERE.md`** (Questo file): Ti dà la bussola sul progetto.
 2. **`JENKINS_LEARNING_GUIDE.md`**: Se non conosci bene Jenkins, leggi questa guida che ti spiegherà come i concetti base di CI/CD si mappano esattamente su questo progetto Oracle.
 3. **`README.md`**: Il manuale operativo vero e proprio. Contiene i prerequisiti, la configurazione, la matrice delle operazioni supportate e le istruzioni di troubleshooting.
+4. **`DEV_SETUP_GUIDE.md`**: Come installare tutto sul tuo PC per testare (Jenkins, Oracle 23ai Free, Oracle Cloud Free Tier, OCI CLI).
+5. **`TEST_MATRIX.md`**: La matrice completa di test da eseguire per validare ogni tipologia (Autonomous, DBCS, cross-type) e ogni operazione.
 
 ---
 
@@ -46,6 +48,8 @@ eni-oracle-datapump-pipeline/
 │
 ├── START_HERE.md                  # 🏁 Questo file.
 ├── JENKINS_LEARNING_GUIDE.md      # 🎓 Guida didattica a Jenkins (flussi operativi, troubleshooting).
+├── DEV_SETUP_GUIDE.md             # 🛠️ Guida installazione ambiente dev (Oracle Free + Jenkins + OCI CLI).
+├── TEST_MATRIX.md                 # 🧪 Matrice completa di test (tutte le tipologie e operazioni).
 └── README.md                      # 📖 Manuale operativo principale (prerequisiti, setup, matrice ops).
 ```
 

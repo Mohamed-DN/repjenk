@@ -296,22 +296,261 @@ Una volta che il Health Check funziona, prova con `EXPORT` e poi con `IMPORT`.
 
 ---
 
+## ☁️ STEP 8: Usare Oracle Cloud Free Tier con Autonomous DB (Come in ENI!)
+
+Dato che ENI usa **Autonomous Database** in produzione, il test più realistico è usare
+il tuo account **Oracle Cloud Free Tier** (Always Free). Avrai un Autonomous DB vero,
+con `DBMS_DATAPUMP`, Object Storage bucket e OCI CLI — esattamente come in produzione.
+
+### A. Creare un Autonomous Database Always Free
+
+1. Accedi a https://cloud.oracle.com con il tuo account Free Tier
+2. Vai su **Oracle Database → Autonomous Database → Create Autonomous Database**
+3. Configura:
+   - **Display name**: `TestDevATP`
+   - **Workload type**: Transaction Processing (ATP)
+   - **Always Free**: ✅ Spunta questa opzione (fondamentale!)
+   - **Database version**: 23ai
+   - **ADMIN password**: Scegli una password robusta (es. `WelcomeTest#2026`)
+   - **Access type**: Secure access from everywhere (per dev va bene)
+4. Clicca **Create** e attendi ~2 minuti
+
+### B. Scaricare il Wallet (Per Connetterti in Sicurezza)
+
+Il Wallet è un file ZIP che contiene i certificati SSL per connetterti all'Autonomous DB.
+
+1. Nella pagina del tuo Autonomous DB, clicca **Database connection**
+2. Clicca **Download wallet**
+3. Inserisci una password per il wallet (es. `WalletPass123`)
+4. Salva il file ZIP, es: `C:\oracle\wallet\Wallet_TestDevATP.zip`
+5. Estrailo nella stessa cartella: `C:\oracle\wallet\`
+6. Modifica il file `sqlnet.ora` estratto per puntare alla directory giusta:
+   ```
+   WALLET_LOCATION = (SOURCE = (METHOD = file) (METHOD_DATA = (DIRECTORY="C:\oracle\wallet")))
+   SSL_SERVER_DN_MATCH=yes
+   ```
+7. Imposta la variabile di ambiente:
+   ```powershell
+   $env:TNS_ADMIN = "C:\oracle\wallet"
+   # Permanente:
+   [System.Environment]::SetEnvironmentVariable("TNS_ADMIN", "C:\oracle\wallet", "User")
+   ```
+8. Verifica la connessione:
+   ```powershell
+   # Il service name lo trovi nel file tnsnames.ora dentro il wallet
+   # Usa il servizio _high per le operazioni Data Pump
+   sqlplus admin/WelcomeTest#2026@testdevatp_high
+   ```
+
+### C. Installare e Configurare OCI CLI
+
+OCI CLI ti serve per gestire l'Object Storage (upload/download dump) da riga di comando.
+
+1. Installa OCI CLI:
+   ```powershell
+   # Metodo ufficiale (PowerShell come Amministratore):
+   Set-ExecutionPolicy RemoteSigned -Scope CurrentUser
+   Invoke-WebRequest https://raw.githubusercontent.com/oracle/oci-cli/master/scripts/install/install.ps1 -OutFile install.ps1
+   .\install.ps1 -AcceptAllDefaults
+   ```
+2. Configura OCI CLI:
+   ```powershell
+   oci setup config
+   # Ti chiederà:
+   #   - User OCID: lo trovi in OCI Console → Profile → My Profile → OCID
+   #   - Tenancy OCID: OCI Console → Administration → Tenancy details → OCID
+   #   - Region: es. eu-milan-1 (o quella del tuo Free Tier)
+   #   - Genera una nuova API key: Y
+   ```
+3. Carica la chiave pubblica generata su OCI:
+   - Vai su **OCI Console → Profile → My Profile → API Keys → Add API Key**
+   - Carica il file `~/.oci/oci_api_key_public.pem`
+4. Verifica:
+   ```powershell
+   oci iam region list --output table
+   # Se vedi la lista delle regioni → tutto OK!
+   ```
+
+### D. Creare un Bucket Object Storage (Per i Dump)
+
+1. Su OCI Console: **Storage → Object Storage → Buckets → Create Bucket**
+2. Nome: `test-datapump-dev`
+3. Lascia le impostazioni di default, clicca **Create**
+4. Annota il **Namespace** (lo trovi nella pagina del bucket, o con):
+   ```powershell
+   oci os ns get
+   # Output: { "data": "tuo_namespace" }
+   ```
+
+### E. Creare la Credenziale OCI nel Database Autonomous
+
+Per far sì che `DBMS_DATAPUMP` scriva i dump direttamente nel bucket, devi creare
+una credenziale OCI all'interno del database:
+
+```sql
+sqlplus admin/WelcomeTest#2026@testdevatp_high
+
+-- Crea la credenziale usando Auth Token
+-- (L'Auth Token lo generi da: OCI Console → Profile → Auth Tokens → Generate Token)
+BEGIN
+    DBMS_CLOUD.CREATE_CREDENTIAL(
+        credential_name => 'OCI_CRED_DEV',
+        username        => 'tua.email@example.com',   -- La tua email di login OCI
+        password        => 'IL_TUO_AUTH_TOKEN'          -- L'Auth Token generato sopra
+    );
+END;
+/
+
+-- Verifica
+SELECT credential_name, username FROM user_credentials;
+
+EXIT;
+```
+
+### F. Creare Schemi di Test sull'Autonomous DB
+
+```sql
+sqlplus admin/WelcomeTest#2026@testdevatp_high
+
+-- Crea schema sorgente
+CREATE USER test_source IDENTIFIED BY TestPass123
+  DEFAULT TABLESPACE DATA QUOTA UNLIMITED ON DATA;
+GRANT CONNECT, RESOURCE, CREATE TABLE TO test_source;
+GRANT DWROLE TO test_source;
+
+-- Crea schema destinazione
+CREATE USER test_target IDENTIFIED BY TestPass123
+  DEFAULT TABLESPACE DATA QUOTA UNLIMITED ON DATA;
+GRANT CONNECT, RESOURCE TO test_target;
+GRANT DWROLE TO test_target;
+
+-- Popola dati di test (come nello STEP 5 sopra)
+-- Connettiti come test_source e crea le tabelle employees e projects
+
+EXIT;
+```
+
+### G. Test Manuale di DBMS_DATAPUMP sull'Autonomous DB
+
+Questo è il test più importante perché replica esattamente il flusso ENI:
+
+```sql
+sqlplus admin/WelcomeTest#2026@testdevatp_high
+
+-- EXPORT via DBMS_DATAPUMP (come fa la nostra pipeline su Autonomous)
+DECLARE
+    v_handle NUMBER;
+BEGIN
+    v_handle := DBMS_DATAPUMP.OPEN(
+        operation => 'EXPORT',
+        job_mode  => 'SCHEMA',
+        job_name  => 'TEST_EXP_01'
+    );
+    DBMS_DATAPUMP.ADD_FILE(
+        handle    => v_handle,
+        filename  => 'test_export.dmp',
+        directory => 'DATA_PUMP_DIR',
+        filetype  => DBMS_DATAPUMP.KU$_FILE_TYPE_DUMP_FILE
+    );
+    DBMS_DATAPUMP.ADD_FILE(
+        handle    => v_handle,
+        filename  => 'test_export.log',
+        directory => 'DATA_PUMP_DIR',
+        filetype  => DBMS_DATAPUMP.KU$_FILE_TYPE_LOG_FILE
+    );
+    DBMS_DATAPUMP.METADATA_FILTER(
+        handle => v_handle,
+        name   => 'SCHEMA_EXPR',
+        value  => 'IN (''TEST_SOURCE'')'
+    );
+    DBMS_DATAPUMP.START_JOB(handle => v_handle);
+    DBMS_DATAPUMP.DETACH(handle => v_handle);
+    DBMS_OUTPUT.PUT_LINE('Export avviato con successo!');
+END;
+/
+
+-- Monitora il job
+SELECT job_name, state, attached_sessions
+FROM DBA_DATAPUMP_JOBS
+WHERE job_name = 'TEST_EXP_01';
+
+-- Quando state = 'NOT RUNNING' → è finito. Verifica il log:
+-- Il file test_export.log sarà in DATA_PUMP_DIR
+EXIT;
+```
+
+### H. Configurare Jenkins per Autonomous DB
+
+Aggiungi queste credenziali in Jenkins (**Manage Jenkins → Credentials**):
+
+| ID Credenziale | Tipo | Valore |
+|---|---|---|
+| `eni-dev-atp-creds` | Username with password | `admin` / `WelcomeTest#2026` |
+| `eni-dev-atp-wallet` | Secret file | Il file `Wallet_TestDevATP.zip` |
+| `oci-config-file` | Secret file | Il file `~/.oci/config` |
+| `oci-api-key` | Secret file | Il file `~/.oci/oci_api_key.pem` |
+
+Poi aggiungi il database nel tuo `databases_local.yaml`:
+
+```yaml
+databases:
+  # ... (i database locali di prima) ...
+
+  CLOUD_ATP_DEV:
+    type: autonomous
+    description: "Cloud Free Tier — Autonomous ATP per test"
+    environment: DEV
+    service_name: testdevatp_high
+    wallet_credential_id: eni-dev-atp-wallet
+    db_credential_id: eni-dev-atp-creds
+    oci_region: eu-milan-1                            # La tua regione
+    compartment_id: "ocid1.compartment.oc1..tuo_id"   # Dal tuo OCI Console
+    adb_ocid: "ocid1.autonomousdatabase.oc1..tuo_id"  # Dal tuo OCI Console
+    bucket: test-datapump-dev
+    credential_name: OCI_CRED_DEV
+    default_tablespace: DATA
+    parallel: 2
+    schemas_allowed: []
+```
+
+### I. Test Finale della Pipeline Completa
+
+Ora puoi testare il flusso reale ENI su Jenkins:
+
+1. **HEALTH_CHECK** su `CLOUD_ATP_DEV` → Verifica connessione al cloud
+2. **EXPORT** da `CLOUD_ATP_DEV`, schema `TEST_SOURCE` → Usa DBMS_DATAPUMP via PL/SQL
+3. **IMPORT** su `CLOUD_ATP_DEV`, schema remap `TEST_SOURCE → TEST_TARGET`
+4. **EXPORT_AND_IMPORT** → Flusso completo con upload su bucket OCI
+
+---
+
 ## ⚠️ Note Importanti
 
 - **Porta 8080**: Se è già occupata (es. da un altro servizio), puoi cambiare la porta Jenkins editando `C:\ProgramData\Jenkins\.jenkins\jenkins.xml` e modificando `--httpPort=8080`.
 - **Firewall**: Se usi Docker, assicurati che la porta 1521 sia aperta.
 - **RAM**: Oracle 23ai Free usa circa 2 GB di RAM. Jenkins ne usa circa 512 MB. Assicurati di avere almeno 8 GB di RAM totale.
 - **Disco**: Oracle + Jenkins + dump occupano circa 5-10 GB di spazio.
+- **Always Free ATP**: L'istanza Always Free ha 1 OCPU e 20 GB di storage. È perfetta per i test ma è più lenta rispetto a un'istanza pagata. I Data Pump funzioneranno, ma con tempi più lunghi su dataset grandi.
+- **Auth Token**: L'Auth Token scade dopo un periodo. Se la credenziale smette di funzionare, rigeneralo su OCI Console e aggiorna la credenziale nel database con `DBMS_CLOUD.UPDATE_CREDENTIAL`.
 
 ---
 
 ## 🎯 Ordine Consigliato di Test
 
-1. ✅ `HEALTH_CHECK` — Verifica che Jenkins si connetta al DB
-2. ✅ `EXPORT` — Esporta lo schema `test_source`
-3. ✅ `IMPORT` — Importa nel `test_target` con remap
-4. ✅ `TABLE_EXPORT` — Esporta solo la tabella `EMPLOYEES`
-5. ✅ `EXPORT_AND_IMPORT` — Flusso completo export → import
-6. ✅ `SWAP_AND_DROP` — Test dello swap schema (crea prima `test_target_NEW`)
+### Fase 1: Locale (DBCS / CLI path)
+1. ✅ `HEALTH_CHECK` su `LOCAL_SOURCE`
+2. ✅ `EXPORT` da `LOCAL_SOURCE` (usa `expdp` CLI)
+3. ✅ `IMPORT` su `LOCAL_TARGET` con remap (usa `impdp` CLI)
+4. ✅ `TABLE_EXPORT` — Solo tabella `EMPLOYEES`
+
+### Fase 2: Cloud (Autonomous / PL/SQL path — come ENI!)
+5. ✅ `HEALTH_CHECK` su `CLOUD_ATP_DEV`
+6. ✅ `EXPORT` da `CLOUD_ATP_DEV` (usa `DBMS_DATAPUMP` via PL/SQL)
+7. ✅ `IMPORT` su `CLOUD_ATP_DEV` con remap
+8. ✅ `EXPORT_AND_IMPORT` — Flusso completo con bucket OCI
+
+### Fase 3: Avanzato
+9. ✅ `SWAP_AND_DROP` — Swap schema su `LOCAL_TARGET`
+10. ✅ `BACKUP` — Export con naming convention timestamp
 
 Buon lavoro! 🚀
