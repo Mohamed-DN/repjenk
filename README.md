@@ -1,12 +1,13 @@
 # 🛢️ M-DN Oracle Data Pump Pipeline
 
-> **Pipeline Jenkins di automazione per operazioni Oracle Data Pump su Oracle Cloud Infrastructure (OCI)**
+> **[UNDER DEV] Pipeline Jenkins di automazione per operazioni Oracle Data Pump su Oracle Cloud Infrastructure (OCI)**
 
+![Status](https://img.shields.io/badge/status-UNDER%20DEV-orange)
 ![Jenkins](https://img.shields.io/badge/Jenkins-2.426+-D24939?logo=jenkins&logoColor=white)
 ![Oracle](https://img.shields.io/badge/Oracle-19c%2F21c%2F23ai-F80000?logo=oracle&logoColor=white)
 ![OCI](https://img.shields.io/badge/OCI-Cloud-1F72C1?logo=oracle&logoColor=white)
 ![Groovy](https://img.shields.io/badge/Groovy-4.x-4298B8?logo=apachegroovy&logoColor=white)
-![License](https://img.shields.io/badge/Licenza-Proprietaria%20ENI-006341)
+![License](https://img.shields.io/badge/Licenza-Proprietaria%20M--DN-006341)
 
 ---
 
