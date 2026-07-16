@@ -5,7 +5,7 @@
 -- Parameters:  &1 = production_schema (current production)
 --              &2 = new_schema (newly imported, to become production)
 --              &3 = drop_old (Y/N - whether to drop the backup schema)
--- Author:      DARKNERO DBA Team
+-- Author:      M-DN DBA Team
 -- Date:        2026-07-12
 -- Platform:    Oracle Autonomous DB (ATP/ADW) / DBCS / On-Premises
 --
@@ -40,7 +40,7 @@ DEFINE drop_old    = &3
 
 PROMPT
 PROMPT ============================================================================
-PROMPT   DARKNERO DATA PUMP PIPELINE - SCHEMA SWAP (CRITICAL OPERATION)
+PROMPT   M-DN DATA PUMP PIPELINE - SCHEMA SWAP (CRITICAL OPERATION)
 PROMPT   Production Schema: &prod_schema
 PROMPT   New Schema:        &new_schema
 PROMPT   Drop Old Backup:   &drop_old
@@ -305,7 +305,7 @@ BEGIN
         v_job_state   VARCHAR2(30);
         v_status      ku$_Status;
         v_log_entry   ku$_LogEntry;
-        v_dp_job_name VARCHAR2(128) := 'DN_SWAP_BKP_' || v_timestamp;
+        v_dp_job_name VARCHAR2(128) := 'M_DN_SWAP_BKP_' || v_timestamp;
     BEGIN
         -- Export dello schema produzione nella directory DATA_PUMP_DIR
         v_dp_handle := DBMS_DATAPUMP.OPEN(
@@ -318,14 +318,14 @@ BEGIN
 
         DBMS_DATAPUMP.ADD_FILE(
             handle    => v_dp_handle,
-            filename  => 'dn_swap_' || LOWER(v_prod_schema) || '_' || v_timestamp || '.dmp',
+            filename  => 'm_dn_swap_' || LOWER(v_prod_schema) || '_' || v_timestamp || '.dmp',
             directory => 'DATA_PUMP_DIR',
             filetype  => DBMS_DATAPUMP.KU$_FILE_TYPE_DUMP_FILE
         );
 
         DBMS_DATAPUMP.ADD_FILE(
             handle    => v_dp_handle,
-            filename  => 'dn_swap_' || LOWER(v_prod_schema) || '_' || v_timestamp || '_exp.log',
+            filename  => 'm_dn_swap_' || LOWER(v_prod_schema) || '_' || v_timestamp || '_exp.log',
             directory => 'DATA_PUMP_DIR',
             filetype  => DBMS_DATAPUMP.KU$_FILE_TYPE_LOG_FILE
         );
@@ -363,14 +363,14 @@ BEGIN
 
         DBMS_DATAPUMP.ADD_FILE(
             handle    => v_dp_handle,
-            filename  => 'dn_swap_' || LOWER(v_prod_schema) || '_' || v_timestamp || '.dmp',
+            filename  => 'm_dn_swap_' || LOWER(v_prod_schema) || '_' || v_timestamp || '.dmp',
             directory => 'DATA_PUMP_DIR',
             filetype  => DBMS_DATAPUMP.KU$_FILE_TYPE_DUMP_FILE
         );
 
         DBMS_DATAPUMP.ADD_FILE(
             handle    => v_dp_handle,
-            filename  => 'dn_swap_' || LOWER(v_prod_schema) || '_' || v_timestamp || '_imp.log',
+            filename  => 'm_dn_swap_' || LOWER(v_prod_schema) || '_' || v_timestamp || '_imp.log',
             directory => 'DATA_PUMP_DIR',
             filetype  => DBMS_DATAPUMP.KU$_FILE_TYPE_LOG_FILE
         );
@@ -453,7 +453,7 @@ BEGIN
     DECLARE
         v_dp_handle   NUMBER;
         v_job_state   VARCHAR2(30);
-        v_dp_job_name VARCHAR2(128) := 'DN_SWAP_NEW_' || v_timestamp;
+        v_dp_job_name VARCHAR2(128) := 'M_DN_SWAP_NEW_' || v_timestamp;
         v_default_ts  VARCHAR2(128);
         v_temp_ts     VARCHAR2(128);
         v_profile     VARCHAR2(128);
@@ -482,14 +482,14 @@ BEGIN
 
         DBMS_DATAPUMP.ADD_FILE(
             handle    => v_dp_handle,
-            filename  => 'dn_swap_' || LOWER(v_new_schema) || '_' || v_timestamp || '.dmp',
+            filename  => 'm_dn_swap_' || LOWER(v_new_schema) || '_' || v_timestamp || '.dmp',
             directory => 'DATA_PUMP_DIR',
             filetype  => DBMS_DATAPUMP.KU$_FILE_TYPE_DUMP_FILE
         );
 
         DBMS_DATAPUMP.ADD_FILE(
             handle    => v_dp_handle,
-            filename  => 'dn_swap_' || LOWER(v_new_schema) || '_' || v_timestamp || '_exp.log',
+            filename  => 'm_dn_swap_' || LOWER(v_new_schema) || '_' || v_timestamp || '_exp.log',
             directory => 'DATA_PUMP_DIR',
             filetype  => DBMS_DATAPUMP.KU$_FILE_TYPE_LOG_FILE
         );
@@ -522,14 +522,14 @@ BEGIN
 
         DBMS_DATAPUMP.ADD_FILE(
             handle    => v_dp_handle,
-            filename  => 'dn_swap_' || LOWER(v_new_schema) || '_' || v_timestamp || '.dmp',
+            filename  => 'm_dn_swap_' || LOWER(v_new_schema) || '_' || v_timestamp || '.dmp',
             directory => 'DATA_PUMP_DIR',
             filetype  => DBMS_DATAPUMP.KU$_FILE_TYPE_DUMP_FILE
         );
 
         DBMS_DATAPUMP.ADD_FILE(
             handle    => v_dp_handle,
-            filename  => 'dn_swap_' || LOWER(v_new_schema) || '_' || v_timestamp || '_imp2.log',
+            filename  => 'm_dn_swap_' || LOWER(v_new_schema) || '_' || v_timestamp || '_imp2.log',
             directory => 'DATA_PUMP_DIR',
             filetype  => DBMS_DATAPUMP.KU$_FILE_TYPE_LOG_FILE
         );

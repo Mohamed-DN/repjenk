@@ -1,7 +1,7 @@
 #!/usr/bin/env groovy
 // =============================================================================
 // oracleConnect.groovy — Libreria condivisa Jenkins per connettività Oracle
-// DARKNERO. — Gestione connessioni e esecuzione SQL/PL/SQL
+// M-DN. — Gestione connessioni e esecuzione SQL/PL/SQL
 // =============================================================================
 // Supporta: Autonomous DB (Oracle Wallet), DBCS (host:port/service),
 // on-premises. Esecuzione SQL tramite sqlplus o sqlcl.
@@ -445,7 +445,7 @@ EXIT;
 private def executeWithWallet(Map dbConfig, String credId, String sqlTool, Closure sqlAction) {
     def walletCredId = dbConfig.walletCredentialId ?: 'oracle-wallet-zip'
     // Estrarre il wallet in /tmp garantisce pulizia OS su reboot ed evita commit nel workspace
-    def walletDir = "/tmp/dn_wallet_${System.currentTimeMillis()}_${UUID.randomUUID().toString().substring(0,8)}"
+    def walletDir = "/tmp/m_dn_wallet_${System.currentTimeMillis()}_${UUID.randomUUID().toString().substring(0,8)}"
 
     def output = ''
     try {

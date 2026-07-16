@@ -1,7 +1,7 @@
 #!/usr/bin/env groovy
 // =============================================================================
 // ociStorage.groovy — Libreria condivisa Jenkins per OCI Object Storage
-// DARKNERO. — Gestione Object Storage per dump Oracle Data Pump
+// M-DN. — Gestione Object Storage per dump Oracle Data Pump
 // =============================================================================
 // Operazioni: upload, download, list, delete, PAR, pulizia dump obsoleti.
 // Tutte le operazioni utilizzano la CLI OCI (oci os object ...).

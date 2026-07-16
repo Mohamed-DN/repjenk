@@ -1,4 +1,4 @@
-# 🔍 Pipeline Review — DARKNERO Oracle Data Pump (2026-07-14)
+# 🔍 Pipeline Review — M-DN Oracle Data Pump (2026-07-14)
 
 Review completa di `Jenkinsfile` + `vars/` con priorità, flusso target e istruzioni operative.
 Fonti: analisi statica del codice + best practice Oracle/Jenkins (link in fondo).
@@ -35,7 +35,7 @@ Il Jenkinsfile invoca questi metodi che **non sono definiti da nessuna parte** �
 
 | Jenkinsfile legge | YAML definisce | Effetto |
 |---|---|---|
-| `credential_id` | `db_credential_id` | cade sempre sul default `dn-src-db-credentials` |
+| `credential_id` | `db_credential_id` | cade sempre sul default `m-dn-src-db-credentials` |
 | `connect_string` | non esiste (c'è `service_name`/`host`) | `SRC_DB_CONNECT_STR` sempre vuoto → connessioni rotte |
 | `ocid` | `adb_ocid` | OCID mai risolto |
 | — | `wallet_credential_id` | mai letto: il wallet usa il default hardcoded |

@@ -10,7 +10,7 @@
 --              &5 = Parallel Degree (1-8)
 --              &6 = Content (ALL / DATA_ONLY / METADATA_ONLY)
 --              &7 = Compression (NONE / BASIC / ALL)
--- Author:      DARKNERO DBA Team
+-- Author:      M-DN DBA Team
 -- Date:        2026-07-12
 -- ==============================================================================
 

@@ -1,12 +1,12 @@
-CREATE OR REPLACE PACKAGE DN_DATA_MASKING AS
+CREATE OR REPLACE PACKAGE M_DN_DATA_MASKING AS
     -- =========================================================================
-    -- Package: DN_DATA_MASKING
+    -- Package: M_DN_DATA_MASKING
     -- Scopo:   Fornire funzioni standardizzate per il Data Masking di dati 
     --          sensibili (GDPR compliance) durante le operazioni di 
     --          refresh degli ambienti (PROD -> DEV/UAT) via Data Pump.
     -- =========================================================================
 
-    -- Mascheramento Email (es. mario.rossi@darknero.com -> m***.r***@darknero.com)
+    -- Mascheramento Email (es. mario.rossi@m-dn.com -> m***.r***@m-dn.com)
     FUNCTION mask_email(p_email IN VARCHAR2) RETURN VARCHAR2;
 
     -- Mascheramento Numero di Telefono (es. +393451234567 -> +39345XXXXXXX)
@@ -21,10 +21,10 @@ CREATE OR REPLACE PACKAGE DN_DATA_MASKING AS
     -- Mascheramento Stringa generica
     FUNCTION mask_string(p_string IN VARCHAR2) RETURN VARCHAR2;
 
-END DN_DATA_MASKING;
+END M_DN_DATA_MASKING;
 /
 
-CREATE OR REPLACE PACKAGE BODY DN_DATA_MASKING AS
+CREATE OR REPLACE PACKAGE BODY M_DN_DATA_MASKING AS
 
     FUNCTION mask_email(p_email IN VARCHAR2) RETURN VARCHAR2 IS
         v_at_pos NUMBER;
@@ -90,5 +90,5 @@ CREATE OR REPLACE PACKAGE BODY DN_DATA_MASKING AS
         RETURN 'MASKED_' || DBMS_RANDOM.STRING('X', 8);
     END mask_string;
 
-END DN_DATA_MASKING;
+END M_DN_DATA_MASKING;
 /

@@ -1,7 +1,7 @@
 #!/usr/bin/env groovy
 // =============================================================================
 // oracleDataPump.groovy — Libreria condivisa Jenkins per Oracle Data Pump
-// DARKNERO. — Automazione Database Oracle su OCI
+// M-DN. — Automazione Database Oracle su OCI
 // =============================================================================
 // Operazioni principali: Export/Import schema e tabelle via CLI (expdp/impdp)
 // per database DBCS e via PL/SQL (DBMS_DATAPUMP) per Autonomous Database.
@@ -1239,7 +1239,7 @@ def generateHtmlReport(Map reportData) {
 <html lang="it">
 <head>
 <meta charset="UTF-8">
-<title>DARKNERO Data Pump Report — ${reportData.operation ?: 'N/A'} #${reportData.buildNumber ?: ''}</title>
+<title>M-DN Data Pump Report — ${reportData.operation ?: 'N/A'} #${reportData.buildNumber ?: ''}</title>
 <style>
   body { font-family: 'Segoe UI', Arial, sans-serif; background: #f5f5f5; color: #333; margin: 0; }
   .container { max-width: 820px; margin: 24px auto; background: #fff; border-radius: 8px;
@@ -1259,7 +1259,7 @@ def generateHtmlReport(Map reportData) {
 <body>
   <div class="container">
     <div class="header">
-      <h1>DARKNERO Oracle Data Pump — Report Operazione</h1>
+      <h1>M-DN Oracle Data Pump — Report Operazione</h1>
       <p>Build #${reportData.buildNumber ?: 'N/A'} — ${reportData.timestamp ?: ''}</p>
     </div>
     <div class="section">

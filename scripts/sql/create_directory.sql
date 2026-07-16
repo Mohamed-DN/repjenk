@@ -4,7 +4,7 @@
 --              Creates/replaces Oracle Directory object and grants access
 -- Parameters:  &1 = directory_name
 --              &2 = directory_path (filesystem path or OCI URI)
--- Author:      DARKNERO DBA Team
+-- Author:      M-DN DBA Team
 -- Date:        2026-07-12
 -- Platform:    Oracle Autonomous DB (ATP/ADW) / DBCS / On-Premises
 -- Notes:       Per Autonomous DB, le directory fisiche non sono supportate.
@@ -26,7 +26,7 @@ DEFINE dir_path = &2
 
 PROMPT
 PROMPT ============================================================================
-PROMPT   DARKNERO DATA PUMP PIPELINE - CREATE DIRECTORY
+PROMPT   M-DN DATA PUMP PIPELINE - CREATE DIRECTORY
 PROMPT   Directory Name: &dir_name
 PROMPT   Directory Path: &dir_path
 PROMPT ============================================================================

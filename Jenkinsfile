@@ -1,17 +1,17 @@
 #!/usr/bin/env groovy
 // =============================================================================
-// DARKNERO Oracle Data Pump Automation Pipeline
+// M-DN Oracle Data Pump Automation Pipeline
 // =============================================================================
-// Pipeline:    dn-oracle-datapump-pipeline
-// Azienda:     DARKNERO. — Direzione ICT / Database Operations
+// Pipeline:    m-dn-oracle-datapump-pipeline
+// Azienda:     M-DN. — Direzione ICT / Database Operations
 // Descrizione: Automazione completa delle operazioni Oracle Data Pump
 //              (export, import, refresh, swap) su Oracle Cloud Infrastructure.
 // Versione:    2.0.0
-// Autore:      DBA Team — DARKNERO ICT
+// Autore:      DBA Team — M-DN ICT
 // Data:        2026-07-12
 // =============================================================================
 
-@Library('dn-oracle-shared-library') _
+@Library('m-dn-oracle-shared-library') _
 
 pipeline {
     agent {
@@ -47,16 +47,16 @@ pipeline {
         TNS_ADMIN                 = "${ORACLE_HOME}/network/admin"
 
         // --- Credenziali database (gestite da Jenkins Credentials Store) ---
-        SRC_DB_CREDENTIALS        = credentials('dn-src-db-credentials')
-        TGT_DB_CREDENTIALS        = credentials('dn-tgt-db-credentials')
-        ADMIN_DB_CREDENTIALS      = credentials('dn-admin-db-credentials')
+        SRC_DB_CREDENTIALS        = credentials('m-dn-src-db-credentials')
+        TGT_DB_CREDENTIALS        = credentials('m-dn-tgt-db-credentials')
+        ADMIN_DB_CREDENTIALS      = credentials('m-dn-admin-db-credentials')
 
         // --- Wallet per Autonomous Database ---
-        ADB_WALLET_DIR            = credentials('dn-adb-wallet-dir')
+        ADB_WALLET_DIR            = credentials('m-dn-adb-wallet-dir')
 
         // --- Configurazione notifiche ---
-        SMTP_CREDENTIALS          = credentials('dn-smtp-credentials')
-        DEFAULT_NOTIFICATION_EMAIL = 'dba-team@darknero.com'
+        SMTP_CREDENTIALS          = credentials('m-dn-smtp-credentials')
+        DEFAULT_NOTIFICATION_EMAIL = 'dba-team@m-dn.com'
 
         // --- Directory di lavoro ---
         DUMP_DIR                  = '/opt/oracle/datapump/dumps'
@@ -192,7 +192,7 @@ pipeline {
             name: 'MASKING_RULES',
             defaultValue: '',
             trim: true,
-            description: 'Regole di masking. Es: HR.USERS.EMAIL:DN_DATA_MASKING.MASK_EMAIL'
+            description: 'Regole di masking. Es: HR.USERS.EMAIL:M_DN_DATA_MASKING.MASK_EMAIL'
         )
         booleanParam(
             name: 'CONFIRM_DESTRUCTIVE',
@@ -210,7 +210,7 @@ pipeline {
             name: 'NOTIFICATION_EMAIL',
             defaultValue: '',
             trim: true,
-            description: 'Email per notifiche (default: dba-team@darknero.com).'
+            description: 'Email per notifiche (default: dba-team@m-dn.com).'
         )
 
         // --- OCI Object Storage ---
@@ -290,7 +290,7 @@ pipeline {
                             env.SRC_DB_CONNECT_STR = srcDb.connect_string ?: ''
                             env.SRC_DB_OCID        = srcDb.ocid ?: ''
                             env.SRC_DB_COMPARTMENT = srcDb.compartment_id ?: ''
-                            env.SRC_CRED_ID        = srcDb.credential_id ?: 'dn-src-db-credentials'
+                            env.SRC_CRED_ID        = srcDb.credential_id ?: 'm-dn-src-db-credentials'
                             echo "\u001B[32m[INFO] Database sorgente '${params.SOURCE_DB}' caricato — tipo: ${env.SRC_DB_TYPE}, ambiente: ${env.SRC_DB_ENV}\u001B[0m"
                         } else {
                             error "[ERRORE] Database sorgente '${params.SOURCE_DB}' non trovato in databases.yaml"
@@ -309,7 +309,7 @@ pipeline {
                             env.TGT_DB_CONNECT_STR = tgtDb.connect_string ?: ''
                             env.TGT_DB_OCID        = tgtDb.ocid ?: ''
                             env.TGT_DB_COMPARTMENT = tgtDb.compartment_id ?: ''
-                            env.TGT_CRED_ID        = tgtDb.credential_id ?: 'dn-tgt-db-credentials'
+                            env.TGT_CRED_ID        = tgtDb.credential_id ?: 'm-dn-tgt-db-credentials'
                             echo "\u001B[32m[INFO] Database destinazione '${params.TARGET_DB}' caricato — tipo: ${env.TGT_DB_TYPE}, ambiente: ${env.TGT_DB_ENV}\u001B[0m"
                         } else {
                             error "[ERRORE] Database destinazione '${params.TARGET_DB}' non trovato in databases.yaml"
@@ -360,7 +360,7 @@ pipeline {
                     // --- Riepilogo inizializzazione ---
                     echo """
 ╔══════════════════════════════════════════════════════════════════╗
-║          DARKNERO Oracle Data Pump — Inizializzazione                ║
+║          M-DN Oracle Data Pump — Inizializzazione                ║
 ╠══════════════════════════════════════════════════════════════════╣
 ║  Operazione:        ${params.OPERATION.padRight(42)}║
 ║  Database Sorgente: ${(params.SOURCE_DB ?: 'N/A').padRight(42)}║
@@ -414,7 +414,7 @@ pipeline {
                     }
 
                     // --- Blocco operazioni distruttive su PROD senza conferma esplicita ---
-                    // Politica di sicurezza DARKNERO: ogni operazione che modifica dati su PROD
+                    // Politica di sicurezza M-DN: ogni operazione che modifica dati su PROD
                     // deve avere CONFIRM_DESTRUCTIVE = true
                     def destructiveOps = ['IMPORT', 'REFRESH_ENV', 'SWAP_AND_DROP', 'TABLE_IMPORT']
                     def isProdTarget = (env.TGT_DB_ENV == 'PROD' || env.SRC_DB_ENV == 'PROD')
@@ -422,7 +422,7 @@ pipeline {
                         errors << """
 [SICUREZZA] Operazione distruttiva '${params.OPERATION}' su ambiente PROD bloccata.
 Impostare CONFIRM_DESTRUCTIVE = true per procedere.
-Questa misura è obbligatoria per la policy di sicurezza DARKNERO."""
+Questa misura è obbligatoria per la policy di sicurezza M-DN."""
                     }
 
                     // --- Validazione formati e caratteri per prevenzione SQL/OS Injection ---
@@ -672,7 +672,7 @@ Questa misura è obbligatoria per la policy di sicurezza DARKNERO."""
             steps {
                 script {
                     // --- Approvazione manuale per ambienti PROD ---
-                    // Politica DARKNERO: export da PROD richiede conferma se non è un backup schedulato
+                    // Politica M-DN: export da PROD richiede conferma se non è un backup schedulato
                     if (env.SRC_DB_ENV == 'PROD' && params.OPERATION != 'BACKUP') {
                         timeout(time: 30, unit: 'MINUTES') {
                             input message: """
@@ -796,7 +796,7 @@ Confermi di voler procedere?""",
             steps {
                 script {
                     // --- Approvazione manuale per import su PROD ---
-                    // Politica DARKNERO: import su PROD richiede doppia conferma
+                    // Politica M-DN: import su PROD richiede doppia conferma
                     if (env.TGT_DB_ENV == 'PROD') {
                         timeout(time: 30, unit: 'MINUTES') {
                             input message: """
@@ -1352,7 +1352,7 @@ e lo schema nuovo prenderà il nome di produzione.""",
                 def totalDuration = currentBuild.durationString ?: 'N/A'
                 echo """
 ╔══════════════════════════════════════════════════════════════════╗
-║          DARKNERO Oracle Data Pump — Riepilogo Finale                ║
+║          M-DN Oracle Data Pump — Riepilogo Finale                ║
 ╠══════════════════════════════════════════════════════════════════╣
 ║  Build:        #${env.BUILD_NUMBER.padRight(50)}║
 ║  Stato:        ${finalStatus.padRight(50)}║
@@ -1370,7 +1370,7 @@ e lo schema nuovo prenderà il nome di produzione.""",
         success {
             script {
                 // --- Notifica successo via email ---
-                def subject = "[DARKNERO DataPump] ✓ ${params.OPERATION} completato — ${params.SCHEMA_NAME}@${params.SOURCE_DB}"
+                def subject = "[M-DN DataPump] ✓ ${params.OPERATION} completato — ${params.SCHEMA_NAME}@${params.SOURCE_DB}"
                 def body = """
 <html>
 <body style="font-family: Arial, sans-serif;">
@@ -1400,7 +1400,7 @@ e lo schema nuovo prenderà il nome di produzione.""",
                 )
                 
                 // --- Notifica Teams ---
-                withCredentials([string(credentialsId: 'dn-teams-webhook', variable: 'TEAMS_WEBHOOK')]) {
+                withCredentials([string(credentialsId: 'm-dn-teams-webhook', variable: 'TEAMS_WEBHOOK')]) {
                     notifyResult.sendTeams(TEAMS_WEBHOOK, params.OPERATION, 'SUCCESS', 'Operazione Data Pump completata con successo.', env.BUILD_URL)
                 }
             }
@@ -1409,7 +1409,7 @@ e lo schema nuovo prenderà il nome di produzione.""",
         failure {
             script {
                 // --- Notifica fallimento con dettagli errore ---
-                def subject = "[DARKNERO DataPump] ✗ FALLITO — ${params.OPERATION} su ${params.SCHEMA_NAME}@${params.SOURCE_DB}"
+                def subject = "[M-DN DataPump] ✗ FALLITO — ${params.OPERATION} su ${params.SCHEMA_NAME}@${params.SOURCE_DB}"
                 def errorLog = ''
                 try {
                     // Tentativo di recuperare le ultime righe del log
@@ -1444,7 +1444,7 @@ e lo schema nuovo prenderà il nome di produzione.""",
                 )
                 
                 // --- Notifica Teams ---
-                withCredentials([string(credentialsId: 'dn-teams-webhook', variable: 'TEAMS_WEBHOOK')]) {
+                withCredentials([string(credentialsId: 'm-dn-teams-webhook', variable: 'TEAMS_WEBHOOK')]) {
                     notifyResult.sendTeams(TEAMS_WEBHOOK, params.OPERATION, 'FAILURE', "L'operazione è fallita. Verificare il log su Jenkins.", env.BUILD_URL)
                 }
             }
@@ -1455,7 +1455,7 @@ e lo schema nuovo prenderà il nome di produzione.""",
                 // --- Notifica per build instabile (discrepanze nei conteggi) ---
                 emailext(
                     to:       env.EFFECTIVE_EMAIL,
-                    subject:  "[DARKNERO DataPump] ⚠ INSTABILE — ${params.OPERATION} su ${params.SCHEMA_NAME} — Discrepanze rilevate",
+                    subject:  "[M-DN DataPump] ⚠ INSTABILE — ${params.OPERATION} su ${params.SCHEMA_NAME} — Discrepanze rilevate",
                     body:     """
 <html>
 <body style="font-family: Arial, sans-serif;">
@@ -1470,7 +1470,7 @@ nei conteggi record tra sorgente e destinazione.</p>
                 )
                 
                 // --- Notifica Teams ---
-                withCredentials([string(credentialsId: 'dn-teams-webhook', variable: 'TEAMS_WEBHOOK')]) {
+                withCredentials([string(credentialsId: 'm-dn-teams-webhook', variable: 'TEAMS_WEBHOOK')]) {
                     notifyResult.sendTeams(TEAMS_WEBHOOK, params.OPERATION, 'WARNING', "Discrepanze rilevate nei conteggi post-import (${env.VERIFICATION_DISCREPANCIES} tabelle discordanti).", env.BUILD_URL)
                 }
             }
@@ -1483,7 +1483,7 @@ nei conteggi record tra sorgente e destinazione.</p>
                 echo "[INFO] Pulizia file temporanei..."
                 sh """
                     rm -f /tmp/datapump_*.tmp 2>/dev/null || true
-                    rm -f /tmp/dn_dp_*.sql 2>/dev/null || true
+                    rm -f /tmp/m_dn_dp_*.sql 2>/dev/null || true
                     echo "[INFO] Pulizia completata."
                 """
 

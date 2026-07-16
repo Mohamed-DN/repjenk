@@ -1,6 +1,6 @@
 # 🏁 START HERE: Mappa del Repository
 
-Benvenuto nel progetto **DARKNERO Oracle Data Pump Pipeline**. 
+Benvenuto nel progetto **M-DN Oracle Data Pump Pipeline**. 
 Se sei un nuovo arrivato (un DBA, un DevOps Engineer o un consulente), questo è il file da leggere per capire come orientarti.
 
 ## 🗺️ Ordine di Lettura Consigliato
@@ -20,7 +20,7 @@ Per comprendere appieno l'automazione, segui esattamente quest'ordine di lettura
 Qui troverai cosa fa ogni singola cartella nel repository. È fondamentale capirlo per sapere *dove* mettere le mani in caso di modifiche.
 
 ```text
-dn-oracle-datapump-pipeline/
+m-dn-oracle-datapump-pipeline/
 │
 ├── .gitignore                     # 🚫 Regole per ignorare file (dump, credenziali, file di test).
 │
@@ -42,7 +42,7 @@ dn-oracle-datapump-pipeline/
 │
 ├── scripts/                       # 🛠️ SCRIPT AUSILIARI (Eseguiti dai groovy in vars/)
 │   ├── sql/                       # Script SQL standard (es. verifica connessione, conteggio record).
-│   │   └── dn_data_masking_pkg.sql # Il package DARKNERO per l'anonimizzazione sicura in Non-Prod.
+│   │   └── m_dn_data_masking_pkg.sql # Il package M-DN per l'anonimizzazione sicura in Non-Prod.
 │   ├── plsql/                     # Script PL/SQL per DBMS_DATAPUMP (export/import/monitor/cleanup).
 │   └── shell/                     # Script Bash per operazioni di sistema (health check, expdp, impdp).
 │

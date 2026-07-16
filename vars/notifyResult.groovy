@@ -1,17 +1,17 @@
 #!/usr/bin/env groovy
 // =============================================================================
 // notifyResult.groovy — Libreria condivisa Jenkins per notifiche e reportistica
-// DARKNERO. — Notifiche email, Slack e report HTML per operazioni Data Pump
+// M-DN. — Notifiche email, Slack e report HTML per operazioni Data Pump
 // =============================================================================
-// Report HTML con branding DARKNERO (giallo #FDB813, verde #009639).
+// Report HTML con branding M-DN (giallo #FDB813, verde #009639).
 // Supporto email con allegati log, Slack con colori stato, audit trail.
 // =============================================================================
 
-// Colori brand DARKNERO per il report HTML
-private static final String DN_YELLOW = '#FDB813'
-private static final String DN_GREEN  = '#009639'
-private static final String DN_DARK   = '#1D1D1B'
-private static final String DN_WHITE  = '#FFFFFF'
+// Colori brand M-DN per il report HTML
+private static final String M_DN_YELLOW = '#FDB813'
+private static final String M_DN_GREEN  = '#009639'
+private static final String M_DN_DARK   = '#1D1D1B'
+private static final String M_DN_WHITE  = '#FFFFFF'
 private static final String STATUS_RED = '#DC3545'
 
 // --------------------------------------------------------------------------
@@ -41,7 +41,7 @@ def sendEmail(String to, String subject, String body, boolean attachLog = true) 
             // Utilizzo del template predefinito per fallback
             recipientProviders: [[$class: 'DevelopersRecipientProvider']],
             // Reply-to per il team DBA
-            replyTo: 'dba-team@darknero.com'
+            replyTo: 'dba-team@m-dn.com'
         )
 
         echo "[Notify/Email] ✔ Email inviata con successo a ${to}"
@@ -68,7 +68,7 @@ def sendSlack(String channel, String message, String status = 'INFO') {
         'FAILURE' : 'danger',    // Rosso
         'WARNING' : 'warning',   // Arancione
         'INFO'    : '#439FE0',   // Blu informativo
-        'STARTED' : DN_YELLOW   // Giallo DARKNERO per inizio operazione
+        'STARTED' : M_DN_YELLOW   // Giallo M-DN per inizio operazione
     ]
     def color = colorMap[status.toUpperCase()] ?: '#439FE0'
 
@@ -82,14 +82,14 @@ def sendSlack(String channel, String message, String status = 'INFO') {
     ]
     def emoji = emojiMap[status.toUpperCase()] ?: 'ℹ️'
 
-    def fullMessage = "${emoji} *DARKNERO Data Pump* | ${message}"
+    def fullMessage = "${emoji} *M-DN Data Pump* | ${message}"
 
     try {
         slackSend(
             channel: channel,
             color: color,
             message: fullMessage,
-            teamDomain: 'dn-dba',
+            teamDomain: 'm-dn-dba',
             // Token Slack dal Jenkins Credentials Store
             tokenCredentialId: 'slack-bot-token'
         )
@@ -110,9 +110,9 @@ def sendTeams(String webhookUrl, String operation, String status, String message
     echo "[Notify/Teams] ➤ Invio notifica a Microsoft Teams"
     
     def colorMap = [
-        'SUCCESS': '009639', // DN_GREEN
+        'SUCCESS': '009639', // M_DN_GREEN
         'FAILURE': 'DC3545', // STATUS_RED
-        'WARNING': 'FDB813', // DN_YELLOW
+        'WARNING': 'FDB813', // M_DN_YELLOW
         'INFO'   : '439FE0'
     ]
     def color = colorMap[status.toUpperCase()] ?: '439FE0'
@@ -121,9 +121,9 @@ def sendTeams(String webhookUrl, String operation, String status, String message
         "@type": "MessageCard",
         "@context": "http://schema.org/extensions",
         "themeColor": "${color}",
-        "summary": "DARKNERO DataPump: ${operation} - ${status}",
+        "summary": "M-DN DataPump: ${operation} - ${status}",
         "sections": [{
-            "activityTitle": "🛢️ **DARKNERO Oracle Data Pump Pipeline**",
+            "activityTitle": "🛢️ **M-DN Oracle Data Pump Pipeline**",
             "activitySubtitle": "Operazione: ${operation}",
             "facts": [
                 { "name": "Status:", "value": "${status}" },
@@ -147,7 +147,7 @@ def sendTeams(String webhookUrl, String operation, String status, String message
 }
 
 // --------------------------------------------------------------------------
-// Costruzione report HTML professionale con branding DARKNERO
+// Costruzione report HTML professionale con branding M-DN
 // Dettagli operazione, tempistiche, dimensioni, confronto record
 // --------------------------------------------------------------------------
 def buildReport(Map operationDetails) {
@@ -169,7 +169,7 @@ def buildReport(Map operationDetails) {
     def jobName    = env.JOB_NAME ?: 'DataPump Pipeline'
 
     // Colore della barra di stato in base al risultato
-    def statusColor = (status == 'SUCCESS') ? DN_GREEN : STATUS_RED
+    def statusColor = (status == 'SUCCESS') ? M_DN_GREEN : STATUS_RED
     def statusIcon  = (status == 'SUCCESS') ? '✔' : '✖'
 
     // Costruzione tabella di confronto record (pre/post import)
@@ -184,28 +184,28 @@ def buildReport(Map operationDetails) {
         optionsSummary = buildOptionsTable(operationDetails.options)
     }
 
-    // Template HTML del report con stile DARKNERO
+    // Template HTML del report con stile M-DN
     def html = """
 <!DOCTYPE html>
 <html lang="it">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DARKNERO Data Pump Report — ${operation}</title>
+    <title>M-DN Data Pump Report — ${operation}</title>
     <style>
         /* Reset e stile base */
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             margin: 0; padding: 0;
             background-color: #f5f5f5;
-            color: ${DN_DARK};
+            color: ${M_DN_DARK};
         }
-        .container { max-width: 800px; margin: 20px auto; background: ${DN_WHITE}; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        .container { max-width: 800px; margin: 20px auto; background: ${M_DN_WHITE}; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
 
-        /* Header con branding DARKNERO */
+        /* Header con branding M-DN */
         .header {
-            background: linear-gradient(135deg, ${DN_GREEN} 0%, ${DN_GREEN}dd 100%);
-            color: ${DN_WHITE};
+            background: linear-gradient(135deg, ${M_DN_GREEN} 0%, ${M_DN_GREEN}dd 100%);
+            color: ${M_DN_WHITE};
             padding: 30px;
             text-align: center;
         }
@@ -216,7 +216,7 @@ def buildReport(Map operationDetails) {
         /* Barra di stato */
         .status-bar {
             background-color: ${statusColor};
-            color: ${DN_WHITE};
+            color: ${M_DN_WHITE};
             padding: 15px 30px;
             font-size: 18px;
             font-weight: bold;
@@ -226,8 +226,8 @@ def buildReport(Map operationDetails) {
         /* Sezione dettagli */
         .section { padding: 20px 30px; }
         .section h2 {
-            color: ${DN_GREEN};
-            border-bottom: 2px solid ${DN_YELLOW};
+            color: ${M_DN_GREEN};
+            border-bottom: 2px solid ${M_DN_YELLOW};
             padding-bottom: 8px;
             margin-top: 25px;
             font-size: 18px;
@@ -240,8 +240,8 @@ def buildReport(Map operationDetails) {
             margin: 10px 0;
         }
         table.details th {
-            background-color: ${DN_GREEN};
-            color: ${DN_WHITE};
+            background-color: ${M_DN_GREEN};
+            color: ${M_DN_WHITE};
             padding: 10px 15px;
             text-align: left;
             font-weight: 600;
@@ -255,7 +255,7 @@ def buildReport(Map operationDetails) {
 
         /* Etichette chiave-valore */
         .kv-row { display: flex; padding: 8px 0; border-bottom: 1px solid #eee; }
-        .kv-label { flex: 0 0 200px; font-weight: 600; color: ${DN_GREEN}; }
+        .kv-label { flex: 0 0 200px; font-weight: 600; color: ${M_DN_GREEN}; }
         .kv-value { flex: 1; }
 
         /* Badge di stato */
@@ -267,27 +267,27 @@ def buildReport(Map operationDetails) {
             font-weight: bold;
             text-transform: uppercase;
         }
-        .badge-success { background: ${DN_GREEN}; color: ${DN_WHITE}; }
-        .badge-failure { background: ${STATUS_RED}; color: ${DN_WHITE}; }
-        .badge-warning { background: ${DN_YELLOW}; color: ${DN_DARK}; }
+        .badge-success { background: ${M_DN_GREEN}; color: ${M_DN_WHITE}; }
+        .badge-failure { background: ${STATUS_RED}; color: ${M_DN_WHITE}; }
+        .badge-warning { background: ${M_DN_YELLOW}; color: ${M_DN_DARK}; }
 
         /* Footer */
         .footer {
-            background-color: ${DN_DARK};
+            background-color: ${M_DN_DARK};
             color: #aaa;
             padding: 15px 30px;
             text-align: center;
             font-size: 12px;
         }
-        .footer a { color: ${DN_YELLOW}; text-decoration: none; }
+        .footer a { color: ${M_DN_YELLOW}; text-decoration: none; }
     </style>
 </head>
 <body>
     <div class="container">
-        <!-- Intestazione con branding DARKNERO -->
+        <!-- Intestazione con branding M-DN -->
         <div class="header">
             <h1>🛢️ Oracle Data Pump Report</h1>
-            <div class="subtitle">DARKNERO. — Automazione Database Oracle</div>
+            <div class="subtitle">M-DN. — Automazione Database Oracle</div>
         </div>
 
         <!-- Barra di stato con risultato operazione -->
@@ -328,7 +328,7 @@ def buildReport(Map operationDetails) {
 
         <!-- Footer -->
         <div class="footer">
-            Report generato automaticamente da <a href="${buildUrl}">Jenkins Pipeline</a> — DARKNERO. DBA Team<br>
+            Report generato automaticamente da <a href="${buildUrl}">Jenkins Pipeline</a> — M-DN. DBA Team<br>
             ${new Date().format('dd/MM/yyyy HH:mm:ss z')}
         </div>
     </div>
@@ -434,7 +434,7 @@ def buildSummaryTable(Map details) {
 
     def summary = """
 ╔══════════════════════════════════════════════════════════════╗
-║  DARKNERO Oracle Data Pump — Riepilogo Operazione               ║
+║  M-DN Oracle Data Pump — Riepilogo Operazione               ║
 ╠══════════════════════════════════════════════════════════════╣
 ║  Stato:        ${statusEmoji} ${status.padRight(44)}║
 ║  Operazione:   ${(details.operation ?: 'N/A').padRight(44)}║
@@ -494,7 +494,7 @@ private String buildComparisonTable(Map preStats, Map postStats) {
         def pre  = preStats.tables?.get(table) ?: 0
         def post = postStats.tables?.get(table) ?: 0
         def delta = post - pre
-        def deltaColor = delta > 0 ? DN_GREEN : (delta < 0 ? STATUS_RED : DN_DARK)
+        def deltaColor = delta > 0 ? M_DN_GREEN : (delta < 0 ? STATUS_RED : M_DN_DARK)
         def statusBadge = delta == 0 ? '<span class="badge badge-success">OK</span>' :
                           (delta > 0 ? '<span class="badge badge-warning">+</span>' :
                                        '<span class="badge badge-failure">-</span>')

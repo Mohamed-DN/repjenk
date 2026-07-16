@@ -1,6 +1,6 @@
 # =============================================================================
-# DARKNERO Oracle Data Pump Pipeline — Configurazione Predefinita
-# Progetto: DARKNERO Oracle Data Pump Automation Pipeline
+# M-DN Oracle Data Pump Pipeline — Configurazione Predefinita
+# Progetto: M-DN Oracle Data Pump Automation Pipeline
 #
 # Questo file definisce i valori predefiniti per tutte le operazioni della
 # pipeline. I valori possono essere sovrascritti a livello di singolo database
@@ -133,22 +133,22 @@ notification:
   email_on_failure: true
   # Lista destinatari email (sovrascrivibile per ambiente)
   email_recipients:
-    - "dba-team@darknero.com"
-    - "devops-team@darknero.com"
+    - "dba-team@m-dn.com"
+    - "devops-team@m-dn.com"
   # Destinatari aggiuntivi solo per errori in produzione
   email_recipients_prod_failure:
-    - "dba-team@darknero.com"
-    - "devops-team@darknero.com"
-    - "it-management@darknero.com"
+    - "dba-team@m-dn.com"
+    - "devops-team@m-dn.com"
+    - "it-management@m-dn.com"
   # Integrazione Slack
   slack_enabled: false
-  slack_channel: "#dn-dba-alerts"
-  slack_credential_id: "dn-slack-webhook"
+  slack_channel: "#m-dn-dba-alerts"
+  slack_credential_id: "m-dn-slack-webhook"
   # Livello minimo notifiche Slack (SUCCESS | WARNING | FAILURE)
   slack_min_level: "WARNING"
   # Microsoft Teams (alternativa)
   teams_enabled: false
-  teams_webhook_credential_id: "dn-teams-webhook"
+  teams_webhook_credential_id: "m-dn-teams-webhook"
 
 # ---------------------------------------------------------------------------
 # Security — Politiche di sicurezza e audit
@@ -196,7 +196,7 @@ naming:
   # Formato timestamp combinato (strftime)
   timestamp_format: "%Y%m%d_%H%M%S"
   # Prefisso job Data Pump
-  job_prefix: "DARKNERO"
+  job_prefix: "M-DN"
   # Lunghezza massima nome job Oracle (limite Oracle: 30 caratteri, 128 da 12.2+)
   max_job_name_length: 30
 

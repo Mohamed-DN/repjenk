@@ -6,7 +6,7 @@
 -- PARAMETERS:  &1 = Target Schema
 --              &2 = Target Tablespace
 --              &3 = Estimated Size MB
--- AUTHOR:      DARKNERO DBA Team (Generato tramite Automazione)
+-- AUTHOR:      M-DN DBA Team (Generato tramite Automazione)
 -- DATE:        2026-07-12
 -- =========================================================================================
 
@@ -36,7 +36,7 @@ DECLARE
     v_warnings   NUMBER := 0;
 BEGIN
     DBMS_OUTPUT.PUT_LINE('================================================================================');
-    DBMS_OUTPUT.PUT_LINE('   🛡️ DARKNERO PIPELINE - PRE-IMPORT SAFETY GATES');
+    DBMS_OUTPUT.PUT_LINE('   🛡️ M-DN PIPELINE - PRE-IMPORT SAFETY GATES');
     DBMS_OUTPUT.PUT_LINE('   Target Schema: ' || v_schema || ' | Tablespace: ' || NVL(v_ts, 'DEFAULT') || ' | Dimensione: ' || v_est_size || ' MB');
     DBMS_OUTPUT.PUT_LINE('================================================================================');
 
