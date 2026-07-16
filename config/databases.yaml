@@ -1,6 +1,6 @@
 # =============================================================================
-# ACME Oracle Database Registry
-# Progetto: ACME Oracle Data Pump Automation Pipeline
+# DARKNERO Oracle Database Registry
+# Progetto: DARKNERO Oracle Data Pump Automation Pipeline
 #
 # Questo file definisce tutte le connessioni database disponibili alla pipeline.
 # I credential_id fanno riferimento a entry nel Jenkins Credentials Store.
@@ -24,13 +24,13 @@
 # ---------------------------------------------------------------------------
 defaults:
   oci_region: "eu-milan-1"
-  bucket: "acme-datapump-shared"
+  bucket: "dn-datapump-shared"
   parallel: 4
   compression: "BASIC"
   retention_days: 30
-  notification_channel: "#acme-dba-alerts"
+  notification_channel: "#dn-dba-alerts"
   tags:
-    project: "ACME-DBA"
+    project: "DARKNERO-DBA"
     managed_by: "jenkins-pipeline"
 
 # ---------------------------------------------------------------------------
@@ -47,12 +47,12 @@ databases:
     description: "Produzione — Core Business ATP (OLTP)"
     environment: PROD
     service_name: "prodcore_atp_high"
-    wallet_credential_id: "acme-prod-core-wallet"
-    db_credential_id: "acme-prod-core-creds"
+    wallet_credential_id: "dn-prod-core-wallet"
+    db_credential_id: "dn-prod-core-creds"
     oci_region: "eu-milan-1"
     compartment_id: "ocid1.compartment.oc1..aaaaaaaaprod123456789"
     adb_ocid: "ocid1.autonomousdatabase.oc1.eu-milan-1.aaaaaaaaprodcore"
-    bucket: "acme-datapump-prod"
+    bucket: "dn-datapump-prod"
     credential_name: "OCI_CRED_PROD"
     default_tablespace: "DATA"
     parallel: 8
@@ -64,9 +64,9 @@ databases:
       - "prodcore_atp_medium"
       - "prodcore_atp_low"
     schemas_allowed:
-      - "ACME_CORE"
-      - "ACME_FINANCE"
-      - "ACME_HR"
+      - "DN_CORE"
+      - "DN_FINANCE"
+      - "DN_HR"
     max_dump_size_gb: 500
     tags:
       business_unit: "Core Systems"
@@ -78,12 +78,12 @@ databases:
     description: "Produzione — Analytics ADW (Data Warehouse)"
     environment: PROD
     service_name: "prodanalytics_adw_high"
-    wallet_credential_id: "acme-prod-analytics-wallet"
-    db_credential_id: "acme-prod-analytics-creds"
+    wallet_credential_id: "dn-prod-analytics-wallet"
+    db_credential_id: "dn-prod-analytics-creds"
     oci_region: "eu-milan-1"
     compartment_id: "ocid1.compartment.oc1..aaaaaaaaprod123456789"
     adb_ocid: "ocid1.autonomousdatabase.oc1.eu-milan-1.aaaaaaaaprodadw"
-    bucket: "acme-datapump-prod"
+    bucket: "dn-datapump-prod"
     credential_name: "OCI_CRED_PROD"
     default_tablespace: "DATA"
     parallel: 16
@@ -94,9 +94,9 @@ databases:
       - "prodanalytics_adw_medium"
       - "prodanalytics_adw_low"
     schemas_allowed:
-      - "ACME_DWH"
-      - "ACME_STAGING"
-      - "ACME_REPORTING"
+      - "DN_DWH"
+      - "DN_STAGING"
+      - "DN_REPORTING"
     max_dump_size_gb: 1000
     tags:
       business_unit: "Analytics & BI"
@@ -114,23 +114,23 @@ databases:
     host: "prod-erp-db.subnet-prod.vcn-prod.oraclevcn.com"
     port: 1521
     service_name: "prod_erp_pdb1.subnet-prod.vcn-prod.oraclevcn.com"
-    db_credential_id: "acme-prod-erp-creds"
-    ssh_credential_id: "acme-prod-erp-ssh"
+    db_credential_id: "dn-prod-erp-creds"
+    ssh_credential_id: "dn-prod-erp-ssh"
     ssh_user: "opc"
     oracle_user: "oracle"
     oracle_home: "/u01/app/oracle/product/19.0.0/dbhome_1"
     data_pump_dir: "DATA_PUMP_DIR"
     data_pump_path: "/u01/app/oracle/admin/datapump"
     oci_region: "eu-milan-1"
-    bucket: "acme-datapump-prod"
-    default_tablespace: "ACME_DATA"
+    bucket: "dn-datapump-prod"
+    default_tablespace: "DN_DATA"
     temp_tablespace: "TEMP"
     parallel: 8
     compression: "ALL"
     retention_days: 90
     schemas_allowed:
-      - "ACME_ERP"
-      - "ACME_ERP_STAGING"
+      - "DN_ERP"
+      - "DN_ERP_STAGING"
     max_dump_size_gb: 750
     tags:
       business_unit: "ERP"
@@ -148,25 +148,25 @@ databases:
     host: "uat-db-01.subnet-uat.vcn-uat.oraclevcn.com"
     port: 1521
     service_name: "uat_pdb1.subnet-uat.vcn-uat.oraclevcn.com"
-    db_credential_id: "acme-uat-dbcs-creds"
-    ssh_credential_id: "acme-uat-dbcs-ssh"
+    db_credential_id: "dn-uat-dbcs-creds"
+    ssh_credential_id: "dn-uat-dbcs-ssh"
     ssh_user: "opc"
     oracle_user: "oracle"
     oracle_home: "/u01/app/oracle/product/19.0.0/dbhome_1"
     data_pump_dir: "DATA_PUMP_DIR"
     data_pump_path: "/u01/app/oracle/admin/datapump"
     oci_region: "eu-milan-1"
-    bucket: "acme-datapump-uat"
+    bucket: "dn-datapump-uat"
     default_tablespace: "USERS"
     temp_tablespace: "TEMP"
     parallel: 4
     compression: "BASIC"
     retention_days: 14
     schemas_allowed:
-      - "ACME_CORE"
-      - "ACME_ERP"
-      - "ACME_DWH"
-      - "ACME_TEST"
+      - "DN_CORE"
+      - "DN_ERP"
+      - "DN_DWH"
+      - "DN_TEST"
     max_dump_size_gb: 200
     tags:
       business_unit: "QA"
@@ -178,12 +178,12 @@ databases:
     description: "UAT — Autonomous Transaction Processing"
     environment: UAT
     service_name: "uatatp01_high"
-    wallet_credential_id: "acme-uat-atp-wallet"
-    db_credential_id: "acme-uat-atp-creds"
+    wallet_credential_id: "dn-uat-atp-wallet"
+    db_credential_id: "dn-uat-atp-creds"
     oci_region: "eu-milan-1"
     compartment_id: "ocid1.compartment.oc1..aaaaaaaauat123456789"
     adb_ocid: "ocid1.autonomousdatabase.oc1.eu-milan-1.aaaaaaaauatatp01"
-    bucket: "acme-datapump-uat"
+    bucket: "dn-datapump-uat"
     credential_name: "OCI_CRED_UAT"
     default_tablespace: "DATA"
     parallel: 4
@@ -194,9 +194,9 @@ databases:
       - "uatatp01_medium"
       - "uatatp01_low"
     schemas_allowed:
-      - "ACME_CORE"
-      - "ACME_FINANCE"
-      - "ACME_TEST"
+      - "DN_CORE"
+      - "DN_FINANCE"
+      - "DN_TEST"
     max_dump_size_gb: 100
     tags:
       business_unit: "QA"
@@ -212,12 +212,12 @@ databases:
     description: "Sviluppo — Autonomous Transaction Processing"
     environment: DEV
     service_name: "devatp01_medium"
-    wallet_credential_id: "acme-dev-atp-wallet"
-    db_credential_id: "acme-dev-atp-creds"
+    wallet_credential_id: "dn-dev-atp-wallet"
+    db_credential_id: "dn-dev-atp-creds"
     oci_region: "eu-milan-1"
     compartment_id: "ocid1.compartment.oc1..aaaaaaaadev123456789"
     adb_ocid: "ocid1.autonomousdatabase.oc1.eu-milan-1.aaaaaaaadev01"
-    bucket: "acme-datapump-dev"
+    bucket: "dn-datapump-dev"
     credential_name: "OCI_CRED_DEV"
     default_tablespace: "DATA"
     parallel: 2
@@ -241,15 +241,15 @@ databases:
     host: "dev-db-01.subnet-dev.vcn-dev.oraclevcn.com"
     port: 1521
     service_name: "dev_pdb1.subnet-dev.vcn-dev.oraclevcn.com"
-    db_credential_id: "acme-dev-dbcs-creds"
-    ssh_credential_id: "acme-dev-dbcs-ssh"
+    db_credential_id: "dn-dev-dbcs-creds"
+    ssh_credential_id: "dn-dev-dbcs-ssh"
     ssh_user: "opc"
     oracle_user: "oracle"
     oracle_home: "/u01/app/oracle/product/19.0.0/dbhome_1"
     data_pump_dir: "DATA_PUMP_DIR"
     data_pump_path: "/u01/app/oracle/admin/datapump"
     oci_region: "eu-milan-1"
-    bucket: "acme-datapump-dev"
+    bucket: "dn-datapump-dev"
     default_tablespace: "USERS"
     temp_tablespace: "TEMP"
     parallel: 2
@@ -271,12 +271,12 @@ databases:
     description: "Disaster Recovery — Core Business ATP (standby)"
     environment: DR
     service_name: "drcore_atp_high"
-    wallet_credential_id: "acme-dr-core-wallet"
-    db_credential_id: "acme-dr-core-creds"
+    wallet_credential_id: "dn-dr-core-wallet"
+    db_credential_id: "dn-dr-core-creds"
     oci_region: "eu-frankfurt-1"
     compartment_id: "ocid1.compartment.oc1..aaaaaaaadr123456789"
     adb_ocid: "ocid1.autonomousdatabase.oc1.eu-frankfurt-1.aaaaaaaadrcore"
-    bucket: "acme-datapump-dr"
+    bucket: "dn-datapump-dr"
     credential_name: "OCI_CRED_DR"
     default_tablespace: "DATA"
     parallel: 8
@@ -286,9 +286,9 @@ databases:
       - "drcore_atp_high"
       - "drcore_atp_medium"
     schemas_allowed:
-      - "ACME_CORE"
-      - "ACME_FINANCE"
-      - "ACME_HR"
+      - "DN_CORE"
+      - "DN_FINANCE"
+      - "DN_HR"
     max_dump_size_gb: 500
     # DR è in regione diversa (Francoforte) per resilienza geografica
     tags:

@@ -55,7 +55,7 @@ pipeline {
 
 ---
 
-## 4. Analisi del Nostro Progetto ACME Data Pump
+## 4. Analisi del Nostro Progetto DARKNERO Data Pump
 
 Andiamo a vedere i componenti chiave della nostra pipeline in `Jenkinsfile` per capire come si traducono nella pratica.
 
@@ -76,11 +76,11 @@ Nel nostro file abbiamo creato diversi Stage, tra cui:
 ### C. La Cassaforte delle Password (`credentials`)
 All'interno degli stage vedrai blocchi come questo:
 ```groovy
-withCredentials([usernamePassword(credentialsId: 'acme-src-db-credentials', ...)]) {
+withCredentials([usernamePassword(credentialsId: 'dn-src-db-credentials', ...)]) {
     // codice
 }
 ```
-Invece di scrivere `admin/Password123!` nel codice, diciamo a Jenkins di andare a prendere la password chiamata `acme-src-db-credentials` dalla sua cassaforte segreta. La password viene resa disponibile solo all'interno di quel blocco, e nei log verrà nascosta con degli asterischi (****).
+Invece di scrivere `admin/Password123!` nel codice, diciamo a Jenkins di andare a prendere la password chiamata `dn-src-db-credentials` dalla sua cassaforte segreta. La password viene resa disponibile solo all'interno di quel blocco, e nei log verrà nascosta con degli asterischi (****).
 
 ### D. Il Blocco `post`
 Questa è l'ultima sezione del `Jenkinsfile`. Gestisce cosa fare al termine della pipeline, indipendentemente da cosa sia successo negli stage:
@@ -109,7 +109,7 @@ In questo modo:
 ## 6. Come usare Jenkins tutti i giorni (Workflow Operativo)
 
 1. **Accesso**: Entri nell'interfaccia web di Jenkins dal tuo browser.
-2. **Selezione del Job**: Clicchi sul progetto `acme-oracle-datapump-pipeline`.
+2. **Selezione del Job**: Clicchi sul progetto `dn-oracle-datapump-pipeline`.
 3. **Avvio**: Nel menu a sinistra clicchi su **"Build with Parameters"** (o Costruisci con Parametri).
 4. **Compilazione form**: Scegli l'operazione (es. IMPORT), selezioni i database di origine e destinazione, inserisci il nome dello schema.
 5. **Esecuzione**: Clicchi su **Build**. 
@@ -153,7 +153,7 @@ Contiene i default per *tutte* le operazioni. Se non specifichi un valore in Jen
 
 ### Flusso A: Export semplice
 ```
-Tu clicchi "Build" con OPERATION=EXPORT, SOURCE_DB=PROD_ATP_CORE, SCHEMA_NAME=ACME_CORE
+Tu clicchi "Build" con OPERATION=EXPORT, SOURCE_DB=PROD_ATP_CORE, SCHEMA_NAME=DN_CORE
    │
    ├─ Stage 1: Initialize → Legge databases.yaml, trova PROD_ATP_CORE, scopre che è "autonomous"
    ├─ Stage 2: Validate → Controlla che tutti i campi siano compilati correttamente
@@ -167,7 +167,7 @@ Tu clicchi "Build" con OPERATION=EXPORT, SOURCE_DB=PROD_ATP_CORE, SCHEMA_NAME=AC
 
 ### Flusso B: Refresh ambiente (PROD → DEV)
 ```
-OPERATION=REFRESH_ENV, SOURCE_DB=PROD_ATP_CORE, TARGET_DB=DEV_ATP_01, SCHEMA_NAME=ACME_CORE
+OPERATION=REFRESH_ENV, SOURCE_DB=PROD_ATP_CORE, TARGET_DB=DEV_ATP_01, SCHEMA_NAME=DN_CORE
    │
    ├─ Initialize → Carica config per entrambi i database
    ├─ Validate → Verifica CONFIRM_DESTRUCTIVE=true (obbligatorio su PROD)
@@ -181,14 +181,14 @@ OPERATION=REFRESH_ENV, SOURCE_DB=PROD_ATP_CORE, TARGET_DB=DEV_ATP_01, SCHEMA_NAM
 
 ### Flusso C: Swap and Drop (Aggiornamento zero-downtime)
 ```
-OPERATION=SWAP_AND_DROP, TARGET_DB=PROD_DBCS_ERP, SCHEMA_NAME=ACME_ERP
+OPERATION=SWAP_AND_DROP, TARGET_DB=PROD_DBCS_ERP, SCHEMA_NAME=DN_ERP
    │
-   ├─ Prerequisiti: Lo schema ACME_ERP_NEW deve già esistere (creato da un import precedente)
+   ├─ Prerequisiti: Lo schema DN_ERP_NEW deve già esistere (creato da un import precedente)
    ├─ Approve → Doppia conferma manuale (solo PROD)
-   ├─ Swap → Rinomina ACME_ERP → ACME_ERP_BKP_20260714
-   │       → Rinomina ACME_ERP_NEW → ACME_ERP
+   ├─ Swap → Rinomina DN_ERP → DN_ERP_BKP_20260714
+   │       → Rinomina DN_ERP_NEW → DN_ERP
    ├─ Verify → Controlla che gli oggetti siano validi
-   ├─ (Opzionale) Drop → Elimina ACME_ERP_BKP_20260714 se DROP_OLD_AFTER_SWAP=true
+   ├─ (Opzionale) Drop → Elimina DN_ERP_BKP_20260714 se DROP_OLD_AFTER_SWAP=true
    └─ Notifica → Report con esito
 ```
 

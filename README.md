@@ -1,4 +1,4 @@
-# 🛢️ ACME Oracle Data Pump Pipeline
+# 🛢️ DARKNERO Oracle Data Pump Pipeline
 
 > **Pipeline Jenkins di automazione per operazioni Oracle Data Pump su Oracle Cloud Infrastructure (OCI)**
 
@@ -30,14 +30,14 @@
 
 > [!IMPORTANT]
 > **Sei nuovo nel progetto?**  
-> Prima di immergerti nei dettagli tecnici, fermati e leggi il file **[START_HERE.md](file:///c:/DBA/acme-oracle-datapump-pipeline/START_HERE.md)**. 
+> Prima di immergerti nei dettagli tecnici, fermati e leggi il file **[START_HERE.md](file:///c:/DBA/dn-oracle-datapump-pipeline/START_HERE.md)**. 
 > Contiene la mappa dell'intero repository e l'ordine corretto in cui leggere la documentazione.
 
 ---
 
 ## 🔭 Panoramica
 
-**ACME Oracle Data Pump Pipeline** è uno strumento di automazione enterprise-grade progettato per gestire
+**DARKNERO Oracle Data Pump Pipeline** è uno strumento di automazione enterprise-grade progettato per gestire
 operazioni Oracle Data Pump (Export/Import) su database Oracle ospitati in **Oracle Cloud Infrastructure (OCI)**.
 
 La pipeline supporta sia database **Autonomous** (ATP/ADW) sia database **DBCS** (DB Cloud Service),
@@ -174,7 +174,7 @@ flowchart TB
 | `oci-fingerprint` | Secret text | Fingerprint della chiave API |
 | `oracle-wallet-zip` | Secret file | Wallet ZIP per Autonomous DB |
 | `email-smtp-credentials` | Username/Password | Credenziali server SMTP |
-| `acme-teams-webhook` | Secret text | Webhook URL per canale Microsoft Teams |
+| `dn-teams-webhook` | Secret text | Webhook URL per canale Microsoft Teams |
 
 ---
 
@@ -183,8 +183,8 @@ flowchart TB
 ### Passo 1 — Clonare il repository
 
 ```bash
-git clone https://git.acme.com/dba-team/acme-oracle-datapump-pipeline.git
-cd acme-oracle-datapump-pipeline
+git clone https://git.darknero.com/dba-team/dn-oracle-datapump-pipeline.git
+cd dn-oracle-datapump-pipeline
 ```
 
 ### Passo 2 — Configurare la Shared Library in Jenkins
@@ -194,10 +194,10 @@ cd acme-oracle-datapump-pipeline
 
 | Campo | Valore |
 |---|---|
-| Name | `acme-datapump-lib` |
+| Name | `dn-datapump-lib` |
 | Default version | `main` |
 | Retrieval method | Modern SCM → Git |
-| Project Repository | `https://git.acme.com/dba-team/acme-oracle-datapump-pipeline.git` |
+| Project Repository | `https://git.darknero.com/dba-team/dn-oracle-datapump-pipeline.git` |
 | Credentials | Credenziali Git appropriate |
 | Load implicitly | ✅ |
 
@@ -222,7 +222,7 @@ Creare o modificare il file `config/databases.yaml` con i database target:
 
 ```yaml
 # config/databases.yaml
-# Configurazione database ACME per Data Pump Pipeline
+# Configurazione database DARKNERO per Data Pump Pipeline
 
 databases:
   # --- Autonomous Database (ATP) ---
@@ -276,7 +276,7 @@ databases:
 ### Passo 5 — Creare il Pipeline Job in Jenkins
 
 1. In Jenkins, cliccare **New Item → Pipeline**
-2. Nome del job: `ACME-DataPump-Pipeline`
+2. Nome del job: `DARKNERO-DataPump-Pipeline`
 3. Nella sezione **Pipeline**:
    - Definition: **Pipeline script from SCM**
    - SCM: Git
@@ -726,7 +726,7 @@ encryption_options:
 # Algoritmi disponibili (ENCRYPTION_ALGORITHM):
   - AES128
   - AES192
-  - AES256         # Consigliato per ACME
+  - AES256         # Consigliato per DARKNERO
 ```
 
 ### Query Filters
@@ -1014,7 +1014,7 @@ I log sono conservati secondo la policy di retention del job Jenkins (default: 3
 ## 📁 Struttura del Progetto
 
 ```
-acme-oracle-datapump-pipeline/
+dn-oracle-datapump-pipeline/
 ├── 📄 Jenkinsfile                          # Pipeline principale (Declarative)
 ├── 📄 README.md                            # Questa documentazione
 ├── 📁 vars/                                # Shared Library - Global Variables
@@ -1029,7 +1029,7 @@ acme-oracle-datapump-pipeline/
 │   ├── 📄 sendNotification.groovy          # Utility: invio notifiche e-mail
 │   └── 📄 loadDatabaseConfig.groovy        # Utility: parsing databases.yaml
 ├── 📁 src/                                 # Shared Library - Classi Groovy
-│   └── 📁 com/acme/dba/
+│   └── 📁 com/darknero/dba/
 │       ├── 📄 DataPumpOperation.groovy     # Enum operazioni
 │       ├── 📄 DatabaseConfig.groovy        # POJO configurazione DB
 │       ├── 📄 ValidationResult.groovy      # Risultato validazione
@@ -1185,16 +1185,16 @@ gitgraph
 
 | Ruolo | Contatto |
 |---|---|
-| Team DBA Oracle | `dba-oracle@acme.com` |
-| Pipeline Owner | `dba-automation@acme.com` |
-| Supporto Infrastruttura | `oci-support@acme.com` |
+| Team DBA Oracle | `dba-oracle@darknero.com` |
+| Pipeline Owner | `dba-automation@darknero.com` |
+| Supporto Infrastruttura | `oci-support@darknero.com` |
 | Canale Teams | `#dba-datapump-pipeline` |
 
 ---
 
 <div align="center">
 
-**ACME S.p.A.** — Direzione ICT — Team Database Administration
+**DARKNERO.** — Direzione ICT — Team Database Administration
 
 *Pipeline versione 1.0.0 — Ultimo aggiornamento: Luglio 2026*
 

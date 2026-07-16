@@ -1,4 +1,4 @@
-# 🧪 Matrice di Test Completa — ACME Oracle Data Pump Pipeline
+# 🧪 Matrice di Test Completa — DARKNERO Oracle Data Pump Pipeline
 
 Questo documento contiene **tutti** i test da eseguire per validare la pipeline
 su ogni tipologia di database e ogni operazione supportata.
@@ -7,7 +7,7 @@ su ogni tipologia di database e ogni operazione supportata.
 
 ## 📊 Mappa Tipologie Database e Come Simularle
 
-| Tipologia ACME | Cosa Usa la Pipeline | Come Simularlo Gratis |
+| Tipologia DARKNERO | Cosa Usa la Pipeline | Come Simularlo Gratis |
 |---|---|---|
 | **Autonomous ATP** (OLTP) | `DBMS_DATAPUMP` via PL/SQL + `sqlplus` | Oracle Cloud Free Tier → ATP Always Free |
 | **Autonomous ADW** (Data Warehouse) | `DBMS_DATAPUMP` via PL/SQL + `sqlplus` | Oracle Cloud Free Tier → ADW Always Free |
@@ -32,7 +32,7 @@ LOCAL_DBCS:
   host: localhost
   port: 1521
   service_name: FREEPDB1
-  credential_id: acme-local-dbcs-creds
+  credential_id: dn-local-dbcs-creds
   data_pump_dir: DATA_PUMP_DIR
   data_pump_path: "C:\\oracle\\datapump"
   oracle_home: "C:\\oracle\\product\\23ai"
@@ -48,8 +48,8 @@ CLOUD_ATP:
   description: "Cloud Free Tier — Autonomous ATP (usa DBMS_DATAPUMP)"
   environment: DEV
   service_name: testdevatp_high
-  wallet_credential_id: acme-dev-atp-wallet
-  db_credential_id: acme-dev-atp-creds
+  wallet_credential_id: dn-dev-atp-wallet
+  db_credential_id: dn-dev-atp-creds
   oci_region: eu-milan-1
   compartment_id: "ocid1.compartment.oc1..tuo_id"
   adb_ocid: "ocid1.autonomousdatabase.oc1..tuo_id"
@@ -69,7 +69,7 @@ LOCAL_DBCS_TARGET:
   host: localhost
   port: 1521
   service_name: FREEPDB1
-  credential_id: acme-local-target-creds
+  credential_id: dn-local-target-creds
   data_pump_dir: DATA_PUMP_DIR
   data_pump_path: "C:\\oracle\\datapump"
   oracle_home: "C:\\oracle\\product\\23ai"
@@ -84,26 +84,26 @@ LOCAL_DBCS_TARGET:
 -- Connettiti come SYS/ADMIN
 
 -- Schema sorgente con dati
-CREATE USER acme_test IDENTIFIED BY TestPass123
+CREATE USER dn_test IDENTIFIED BY TestPass123
   DEFAULT TABLESPACE USERS QUOTA UNLIMITED ON USERS;  -- su locale
   -- oppure DATA su Autonomous
-GRANT CONNECT, RESOURCE, CREATE TABLE, CREATE VIEW, CREATE PROCEDURE TO acme_test;
+GRANT CONNECT, RESOURCE, CREATE TABLE, CREATE VIEW, CREATE PROCEDURE TO dn_test;
 
 -- Schema target vuoto
-CREATE USER acme_test_target IDENTIFIED BY TestPass123
+CREATE USER dn_test_target IDENTIFIED BY TestPass123
   DEFAULT TABLESPACE USERS QUOTA UNLIMITED ON USERS;
-GRANT CONNECT, RESOURCE TO acme_test_target;
+GRANT CONNECT, RESOURCE TO dn_test_target;
 
 -- Schema per swap test
-CREATE USER acme_test_new IDENTIFIED BY TestPass123
+CREATE USER dn_test_new IDENTIFIED BY TestPass123
   DEFAULT TABLESPACE USERS QUOTA UNLIMITED ON USERS;
-GRANT CONNECT, RESOURCE TO acme_test_new;
+GRANT CONNECT, RESOURCE TO dn_test_new;
 ```
 
-Popola `acme_test` con dati di test diversificati:
+Popola `dn_test` con dati di test diversificati:
 
 ```sql
--- Connettiti come acme_test
+-- Connettiti come dn_test
 CREATE TABLE employees (
     id NUMBER PRIMARY KEY,
     name VARCHAR2(100),
@@ -142,7 +142,7 @@ CREATE TABLE transactions (
 BEGIN
     FOR i IN 1..5000 LOOP
         INSERT INTO employees VALUES (
-            i, 'Emp_'||i, 'emp'||i||'@acme.com',
+            i, 'Emp_'||i, 'emp'||i||'@darknero.com',
             ROUND(DBMS_RANDOM.VALUE(25000,150000),2),
             'SSN-'||LPAD(i,9,'0'),
             CASE MOD(i,5) WHEN 0 THEN 'IT' WHEN 1 THEN 'FINANCE'
@@ -204,7 +204,7 @@ CREATE INDEX idx_tx_date ON transactions(tx_date);
 | 1.5 | Import DBCS | `IMPORT` | `LOCAL_DBCS` | `LOCAL_DBCS_TARGET` | `impdp` CLI | ⬜ |
 | 1.6 | Import Autonomous | `IMPORT` | `CLOUD_ATP` | `CLOUD_ATP` | `DBMS_DATAPUMP` PL/SQL | ⬜ |
 
-### GRUPPO 2: Flussi Cross-Type (Il Cuore di ACME)
+### GRUPPO 2: Flussi Cross-Type (Il Cuore di DARKNERO)
 
 | # | Test | Operazione | Sorgente | Target | Cosa Testa |Stato |
 |---|---|---|---|---|---|---|
@@ -216,10 +216,10 @@ CREATE INDEX idx_tx_date ON transactions(tx_date);
 
 | # | Test | Operazione | Opzioni | Cosa Testa | Stato |
 |---|---|---|---|---|---|
-| 3.1 | Import con REMAP_SCHEMA | `IMPORT` su DBCS | `REMAP_SCHEMA=acme_test:acme_test_target` | Remap schema base | ⬜ |
+| 3.1 | Import con REMAP_SCHEMA | `IMPORT` su DBCS | `REMAP_SCHEMA=dn_test:dn_test_target` | Remap schema base | ⬜ |
 | 3.2 | Import con REMAP_TABLESPACE | `IMPORT` su DBCS | `REMAP_TABLESPACE=USERS:SYSAUX` | Cambio tablespace | ⬜ |
-| 3.3 | Import con CREATE_NEW_SCHEMA | `IMPORT` su DBCS | `CREATE_NEW_SCHEMA=true` | Crea `acme_test_NEW` | ⬜ |
-| 3.4 | Remap su Autonomous | `IMPORT` su ATP | `REMAP_SCHEMA=acme_test:acme_test_target` | PL/SQL `METADATA_REMAP` | ⬜ |
+| 3.3 | Import con CREATE_NEW_SCHEMA | `IMPORT` su DBCS | `CREATE_NEW_SCHEMA=true` | Crea `dn_test_NEW` | ⬜ |
+| 3.4 | Remap su Autonomous | `IMPORT` su ATP | `REMAP_SCHEMA=dn_test:dn_test_target` | PL/SQL `METADATA_REMAP` | ⬜ |
 
 ### GRUPPO 4: Export/Import Tabelle Specifiche
 
@@ -256,7 +256,7 @@ CREATE INDEX idx_tx_date ON transactions(tx_date);
 
 | # | Test | Operazione | Opzioni | Cosa Testa | Stato |
 |---|---|---|---|---|---|
-| 7.1 | Export con Data Masking | `EXPORT` | `ENABLE_DATA_MASKING=true`, `MASKING_RULES=acme_test.EMPLOYEES.SSN:ACME_DATA_MASKING.MASK_SSN` | Colonna SSN offuscata | ⬜ |
+| 7.1 | Export con Data Masking | `EXPORT` | `ENABLE_DATA_MASKING=true`, `MASKING_RULES=dn_test.EMPLOYEES.SSN:DN_DATA_MASKING.MASK_SSN` | Colonna SSN offuscata | ⬜ |
 | 7.2 | Blocco QUERY_FILTER injection | `EXPORT` | `QUERY_FILTER=WHERE 1=1; DROP TABLE x` | Deve fallire in validazione | ⬜ |
 | 7.3 | Blocco caratteri speciali | `EXPORT` | `SCHEMA_NAME=test'; DROP--` | Deve fallire in validazione | ⬜ |
 | 7.4 | DRY_RUN mode | `EXPORT` | `DRY_RUN=true` | Simula senza eseguire | ⬜ |
@@ -265,8 +265,8 @@ CREATE INDEX idx_tx_date ON transactions(tx_date);
 
 | # | Test | Operazione | Prerequisiti | Opzioni | Stato |
 |---|---|---|---|---|---|
-| 8.1 | Swap schema DBCS | `SWAP_AND_DROP` su DBCS | Crea `acme_test_NEW` con dati | `DROP_OLD_AFTER_SWAP=false` | ⬜ |
-| 8.2 | Swap + Drop DBCS | `SWAP_AND_DROP` su DBCS | Crea `acme_test_NEW` | `DROP_OLD_AFTER_SWAP=true` | ⬜ |
+| 8.1 | Swap schema DBCS | `SWAP_AND_DROP` su DBCS | Crea `dn_test_NEW` con dati | `DROP_OLD_AFTER_SWAP=false` | ⬜ |
+| 8.2 | Swap + Drop DBCS | `SWAP_AND_DROP` su DBCS | Crea `dn_test_NEW` | `DROP_OLD_AFTER_SWAP=true` | ⬜ |
 | 8.3 | Import + Swap automatico | `IMPORT` su DBCS | — | `CREATE_NEW_SCHEMA=true`, `SWAP_AFTER_IMPORT=true` | ⬜ |
 
 ### GRUPPO 9: Backup e Cleanup

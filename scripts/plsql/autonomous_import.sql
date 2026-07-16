@@ -10,7 +10,7 @@
 --              &6 = Remap Schema (OLD:NEW o "NONE")
 --              &7 = Remap Tablespace (OLD:NEW o "NONE")
 --              &8 = Table Exists Action (SKIP/REPLACE/APPEND/TRUNCATE)
--- Author:      ACME DBA Team
+-- Author:      DARKNERO DBA Team
 -- Date:        2026-07-12
 -- ==============================================================================
 

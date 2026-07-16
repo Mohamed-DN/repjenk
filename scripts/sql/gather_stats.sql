@@ -5,7 +5,7 @@
 --              delle performance dell'optimizer su query pesanti.
 -- Parameters:  &1 = Schema Name
 --              &2 = Degree of Parallelism
--- Author:      ACME DBA Team (Generato tramite Automazione)
+-- Author:      DARKNERO DBA Team (Generato tramite Automazione)
 -- Date:        2026-07-12
 -- ==============================================================================
 

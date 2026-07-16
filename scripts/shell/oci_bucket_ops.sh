@@ -1,7 +1,7 @@
 #!/bin/bash
 ###############################################################################
 # oci_bucket_ops.sh — Operazioni OCI Object Storage
-# Progetto: ACME Oracle Data Pump Automation Pipeline
+# Progetto: DARKNERO Oracle Data Pump Automation Pipeline
 #
 # Utilizzo:
 #   oci_bucket_ops.sh <action> [options...]

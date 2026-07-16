@@ -4,7 +4,7 @@
 --              Identifica gli oggetti più pesanti per stimare i tempi di export e
 --              consiglia i parametri di Data Pump (parallelismo, compressione).
 -- PARAMETERS:  &1 = Schema Name
--- AUTHOR:      ACME DBA Team (Generato tramite Automazione)
+-- AUTHOR:      DARKNERO DBA Team (Generato tramite Automazione)
 -- DATE:        2026-07-12
 -- =========================================================================================
 

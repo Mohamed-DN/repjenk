@@ -3,7 +3,7 @@
 -- PURPOSE:     Verifica approfondita della connettività e dei privilegi DB per la pipeline
 --              di Data Pump. Estrae dettagli completi sull'ambiente (Autonomous, DBCS, On-Prem).
 --              Identifica eventuali mancanze di ruoli e verifica lo stato del wallet OCI.
--- AUTHOR:      ACME DBA Team (Generato tramite Automazione)
+-- AUTHOR:      DARKNERO DBA Team (Generato tramite Automazione)
 -- DATE:        2026-07-12
 -- PLATFORM:    Oracle 19c+ (ATP, ADW, DBCS, On-Premises)
 -- =========================================================================================
@@ -46,7 +46,7 @@ DECLARE
     e_missing_privs    EXCEPTION;
 BEGIN
     DBMS_OUTPUT.PUT_LINE('================================================================================');
-    DBMS_OUTPUT.PUT_LINE('   🔍 ACME ORACLE DATA PUMP PIPELINE - HEALTH & CONNECTION DIAGNOSTICS 🔍');
+    DBMS_OUTPUT.PUT_LINE('   🔍 DARKNERO ORACLE DATA PUMP PIPELINE - HEALTH & CONNECTION DIAGNOSTICS 🔍');
     DBMS_OUTPUT.PUT_LINE('================================================================================');
     DBMS_OUTPUT.PUT_LINE('Time: ' || TO_CHAR(SYSDATE, 'YYYY-MM-DD HH24:MI:SS TZR'));
     DBMS_OUTPUT.PUT_LINE('User: ' || SYS_CONTEXT('USERENV', 'SESSION_USER'));
