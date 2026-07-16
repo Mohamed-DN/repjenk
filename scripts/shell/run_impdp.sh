@@ -1,7 +1,7 @@
 #!/bin/bash
 ###############################################################################
 # run_impdp.sh — Wrapper per Oracle Data Pump Import (impdp)
-# Progetto: ENI Oracle Data Pump Automation Pipeline
+# Progetto: ACME Oracle Data Pump Automation Pipeline
 # Ambiente: DBCS / VM (NON Autonomous Database)
 #
 # Utilizzo:
@@ -212,7 +212,7 @@ fi
 # Verifica prerequisiti
 # ===========================================================================
 log_info "============================================================"
-log_info " ENI Data Pump Import — Avvio"
+log_info " ACME Data Pump Import — Avvio"
 log_info " Schema: ${SCHEMA}"
 log_info " Dump Dir: ${DUMP_DIR}"
 log_info " Dump File: ${DUMP_FILE}"
@@ -340,7 +340,7 @@ build_impdp_command() {
     [[ -n "${SQLFILE:-}" ]] && cmd_args+=("SQLFILE=${SQLFILE}")
 
     # Job name univoco
-    local job_name="ENI_IMP_${SCHEMA}_${TIMESTAMP}"
+    local job_name="ACME_IMP_${SCHEMA}_${TIMESTAMP}"
     job_name="${job_name:0:30}"
     cmd_args+=("JOB_NAME=${job_name}")
 
@@ -355,13 +355,13 @@ build_impdp_command() {
 # ===========================================================================
 generate_parfile() {
     local parfile_dir="/tmp"
-    PARFILE_PATH="${parfile_dir}/eni_impdp_${SCHEMA}_${TIMESTAMP}.par"
+    PARFILE_PATH="${parfile_dir}/acme_impdp_${SCHEMA}_${TIMESTAMP}.par"
 
     log_info "Generazione parfile: ${PARFILE_PATH}"
 
     cat > "${PARFILE_PATH}" <<PAREOF
 # =============================================================================
-# ENI Data Pump Import — Parfile generato automaticamente
+# ACME Data Pump Import — Parfile generato automaticamente
 # Schema: ${SCHEMA}
 # Data: $(date '+%Y-%m-%d %H:%M:%S')
 # =============================================================================
@@ -416,7 +416,7 @@ PAREOF
     [[ "${TRANSFORM_OID,,}" == "true" ]]      && echo "TRANSFORM=OID:N" >> "${PARFILE_PATH}"
     [[ -n "${SQLFILE:-}" ]]                   && echo "SQLFILE=${SQLFILE}" >> "${PARFILE_PATH}"
 
-    local job_name="ENI_IMP_${SCHEMA}_${TIMESTAMP}"
+    local job_name="ACME_IMP_${SCHEMA}_${TIMESTAMP}"
     echo "JOB_NAME=${job_name:0:30}" >> "${PARFILE_PATH}"
     echo "METRICS=YES" >> "${PARFILE_PATH}"
 

@@ -2,7 +2,7 @@
 -- Script Name: monitor_job.sql
 -- Purpose:     Monitoraggio avanzato di job Data Pump in esecuzione.
 -- Parameters:  &1 = Job Name (Opzionale. Se vuoto mostra tutti)
--- Author:      ENI DBA Team
+-- Author:      ACME DBA Team
 -- Date:        2026-07-12
 -- ==============================================================================
 

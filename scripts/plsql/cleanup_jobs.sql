@@ -3,7 +3,7 @@
 -- Purpose:     Identifica e pulisce job Data Pump orfani (STOPPED/NOT RUNNING),
 --              evitando l'accumulo di Master Table nello schema.
 -- Parameters:  None
--- Author:      ENI DBA Team
+-- Author:      ACME DBA Team
 -- Date:        2026-07-12
 -- ==============================================================================
 

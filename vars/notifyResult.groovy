@@ -1,17 +1,17 @@
 #!/usr/bin/env groovy
 // =============================================================================
 // notifyResult.groovy — Libreria condivisa Jenkins per notifiche e reportistica
-// ENI S.p.A. — Notifiche email, Slack e report HTML per operazioni Data Pump
+// ACME S.p.A. — Notifiche email, Slack e report HTML per operazioni Data Pump
 // =============================================================================
-// Report HTML con branding ENI (giallo #FDB813, verde #009639).
+// Report HTML con branding ACME (giallo #FDB813, verde #009639).
 // Supporto email con allegati log, Slack con colori stato, audit trail.
 // =============================================================================
 
-// Colori brand ENI per il report HTML
-private static final String ENI_YELLOW = '#FDB813'
-private static final String ENI_GREEN  = '#009639'
-private static final String ENI_DARK   = '#1D1D1B'
-private static final String ENI_WHITE  = '#FFFFFF'
+// Colori brand ACME per il report HTML
+private static final String ACME_YELLOW = '#FDB813'
+private static final String ACME_GREEN  = '#009639'
+private static final String ACME_DARK   = '#1D1D1B'
+private static final String ACME_WHITE  = '#FFFFFF'
 private static final String STATUS_RED = '#DC3545'
 
 // --------------------------------------------------------------------------
@@ -41,7 +41,7 @@ def sendEmail(String to, String subject, String body, boolean attachLog = true) 
             // Utilizzo del template predefinito per fallback
             recipientProviders: [[$class: 'DevelopersRecipientProvider']],
             // Reply-to per il team DBA
-            replyTo: 'dba-team@eni.com'
+            replyTo: 'dba-team@acme.com'
         )
 
         echo "[Notify/Email] ✔ Email inviata con successo a ${to}"
@@ -68,7 +68,7 @@ def sendSlack(String channel, String message, String status = 'INFO') {
         'FAILURE' : 'danger',    // Rosso
         'WARNING' : 'warning',   // Arancione
         'INFO'    : '#439FE0',   // Blu informativo
-        'STARTED' : ENI_YELLOW   // Giallo ENI per inizio operazione
+        'STARTED' : ACME_YELLOW   // Giallo ACME per inizio operazione
     ]
     def color = colorMap[status.toUpperCase()] ?: '#439FE0'
 
@@ -82,14 +82,14 @@ def sendSlack(String channel, String message, String status = 'INFO') {
     ]
     def emoji = emojiMap[status.toUpperCase()] ?: 'ℹ️'
 
-    def fullMessage = "${emoji} *ENI Data Pump* | ${message}"
+    def fullMessage = "${emoji} *ACME Data Pump* | ${message}"
 
     try {
         slackSend(
             channel: channel,
             color: color,
             message: fullMessage,
-            teamDomain: 'eni-dba',
+            teamDomain: 'acme-dba',
             // Token Slack dal Jenkins Credentials Store
             tokenCredentialId: 'slack-bot-token'
         )
@@ -110,9 +110,9 @@ def sendTeams(String webhookUrl, String operation, String status, String message
     echo "[Notify/Teams] ➤ Invio notifica a Microsoft Teams"
     
     def colorMap = [
-        'SUCCESS': '009639', // ENI_GREEN
+        'SUCCESS': '009639', // ACME_GREEN
         'FAILURE': 'DC3545', // STATUS_RED
-        'WARNING': 'FDB813', // ENI_YELLOW
+        'WARNING': 'FDB813', // ACME_YELLOW
         'INFO'   : '439FE0'
     ]
     def color = colorMap[status.toUpperCase()] ?: '439FE0'
@@ -121,9 +121,9 @@ def sendTeams(String webhookUrl, String operation, String status, String message
         "@type": "MessageCard",
         "@context": "http://schema.org/extensions",
         "themeColor": "${color}",
-        "summary": "ENI DataPump: ${operation} - ${status}",
+        "summary": "ACME DataPump: ${operation} - ${status}",
         "sections": [{
-            "activityTitle": "🛢️ **ENI Oracle Data Pump Pipeline**",
+            "activityTitle": "🛢️ **ACME Oracle Data Pump Pipeline**",
             "activitySubtitle": "Operazione: ${operation}",
             "facts": [
                 { "name": "Status:", "value": "${status}" },
@@ -147,7 +147,7 @@ def sendTeams(String webhookUrl, String operation, String status, String message
 }
 
 // --------------------------------------------------------------------------
-// Costruzione report HTML professionale con branding ENI
+// Costruzione report HTML professionale con branding ACME
 // Dettagli operazione, tempistiche, dimensioni, confronto record
 // --------------------------------------------------------------------------
 def buildReport(Map operationDetails) {
@@ -169,7 +169,7 @@ def buildReport(Map operationDetails) {
     def jobName    = env.JOB_NAME ?: 'DataPump Pipeline'
 
     // Colore della barra di stato in base al risultato
-    def statusColor = (status == 'SUCCESS') ? ENI_GREEN : STATUS_RED
+    def statusColor = (status == 'SUCCESS') ? ACME_GREEN : STATUS_RED
     def statusIcon  = (status == 'SUCCESS') ? '✔' : '✖'
 
     // Costruzione tabella di confronto record (pre/post import)
@@ -184,28 +184,28 @@ def buildReport(Map operationDetails) {
         optionsSummary = buildOptionsTable(operationDetails.options)
     }
 
-    // Template HTML del report con stile ENI
+    // Template HTML del report con stile ACME
     def html = """
 <!DOCTYPE html>
 <html lang="it">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ENI Data Pump Report — ${operation}</title>
+    <title>ACME Data Pump Report — ${operation}</title>
     <style>
         /* Reset e stile base */
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             margin: 0; padding: 0;
             background-color: #f5f5f5;
-            color: ${ENI_DARK};
+            color: ${ACME_DARK};
         }
-        .container { max-width: 800px; margin: 20px auto; background: ${ENI_WHITE}; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        .container { max-width: 800px; margin: 20px auto; background: ${ACME_WHITE}; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
 
-        /* Header con branding ENI */
+        /* Header con branding ACME */
         .header {
-            background: linear-gradient(135deg, ${ENI_GREEN} 0%, ${ENI_GREEN}dd 100%);
-            color: ${ENI_WHITE};
+            background: linear-gradient(135deg, ${ACME_GREEN} 0%, ${ACME_GREEN}dd 100%);
+            color: ${ACME_WHITE};
             padding: 30px;
             text-align: center;
         }
@@ -216,7 +216,7 @@ def buildReport(Map operationDetails) {
         /* Barra di stato */
         .status-bar {
             background-color: ${statusColor};
-            color: ${ENI_WHITE};
+            color: ${ACME_WHITE};
             padding: 15px 30px;
             font-size: 18px;
             font-weight: bold;
@@ -226,8 +226,8 @@ def buildReport(Map operationDetails) {
         /* Sezione dettagli */
         .section { padding: 20px 30px; }
         .section h2 {
-            color: ${ENI_GREEN};
-            border-bottom: 2px solid ${ENI_YELLOW};
+            color: ${ACME_GREEN};
+            border-bottom: 2px solid ${ACME_YELLOW};
             padding-bottom: 8px;
             margin-top: 25px;
             font-size: 18px;
@@ -240,8 +240,8 @@ def buildReport(Map operationDetails) {
             margin: 10px 0;
         }
         table.details th {
-            background-color: ${ENI_GREEN};
-            color: ${ENI_WHITE};
+            background-color: ${ACME_GREEN};
+            color: ${ACME_WHITE};
             padding: 10px 15px;
             text-align: left;
             font-weight: 600;
@@ -255,7 +255,7 @@ def buildReport(Map operationDetails) {
 
         /* Etichette chiave-valore */
         .kv-row { display: flex; padding: 8px 0; border-bottom: 1px solid #eee; }
-        .kv-label { flex: 0 0 200px; font-weight: 600; color: ${ENI_GREEN}; }
+        .kv-label { flex: 0 0 200px; font-weight: 600; color: ${ACME_GREEN}; }
         .kv-value { flex: 1; }
 
         /* Badge di stato */
@@ -267,27 +267,27 @@ def buildReport(Map operationDetails) {
             font-weight: bold;
             text-transform: uppercase;
         }
-        .badge-success { background: ${ENI_GREEN}; color: ${ENI_WHITE}; }
-        .badge-failure { background: ${STATUS_RED}; color: ${ENI_WHITE}; }
-        .badge-warning { background: ${ENI_YELLOW}; color: ${ENI_DARK}; }
+        .badge-success { background: ${ACME_GREEN}; color: ${ACME_WHITE}; }
+        .badge-failure { background: ${STATUS_RED}; color: ${ACME_WHITE}; }
+        .badge-warning { background: ${ACME_YELLOW}; color: ${ACME_DARK}; }
 
         /* Footer */
         .footer {
-            background-color: ${ENI_DARK};
+            background-color: ${ACME_DARK};
             color: #aaa;
             padding: 15px 30px;
             text-align: center;
             font-size: 12px;
         }
-        .footer a { color: ${ENI_YELLOW}; text-decoration: none; }
+        .footer a { color: ${ACME_YELLOW}; text-decoration: none; }
     </style>
 </head>
 <body>
     <div class="container">
-        <!-- Intestazione con branding ENI -->
+        <!-- Intestazione con branding ACME -->
         <div class="header">
             <h1>🛢️ Oracle Data Pump Report</h1>
-            <div class="subtitle">ENI S.p.A. — Automazione Database Oracle</div>
+            <div class="subtitle">ACME S.p.A. — Automazione Database Oracle</div>
         </div>
 
         <!-- Barra di stato con risultato operazione -->
@@ -328,7 +328,7 @@ def buildReport(Map operationDetails) {
 
         <!-- Footer -->
         <div class="footer">
-            Report generato automaticamente da <a href="${buildUrl}">Jenkins Pipeline</a> — ENI S.p.A. DBA Team<br>
+            Report generato automaticamente da <a href="${buildUrl}">Jenkins Pipeline</a> — ACME S.p.A. DBA Team<br>
             ${new Date().format('dd/MM/yyyy HH:mm:ss z')}
         </div>
     </div>
@@ -434,7 +434,7 @@ def buildSummaryTable(Map details) {
 
     def summary = """
 ╔══════════════════════════════════════════════════════════════╗
-║  ENI Oracle Data Pump — Riepilogo Operazione               ║
+║  ACME Oracle Data Pump — Riepilogo Operazione               ║
 ╠══════════════════════════════════════════════════════════════╣
 ║  Stato:        ${statusEmoji} ${status.padRight(44)}║
 ║  Operazione:   ${(details.operation ?: 'N/A').padRight(44)}║
@@ -494,7 +494,7 @@ private String buildComparisonTable(Map preStats, Map postStats) {
         def pre  = preStats.tables?.get(table) ?: 0
         def post = postStats.tables?.get(table) ?: 0
         def delta = post - pre
-        def deltaColor = delta > 0 ? ENI_GREEN : (delta < 0 ? STATUS_RED : ENI_DARK)
+        def deltaColor = delta > 0 ? ACME_GREEN : (delta < 0 ? STATUS_RED : ACME_DARK)
         def statusBadge = delta == 0 ? '<span class="badge badge-success">OK</span>' :
                           (delta > 0 ? '<span class="badge badge-warning">+</span>' :
                                        '<span class="badge badge-failure">-</span>')

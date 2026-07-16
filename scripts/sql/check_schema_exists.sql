@@ -4,7 +4,7 @@
 --              Analizza stato account, lock, tablespace di default, profili, e
 --              consistenza degli oggetti (identifica oggetti invalidi prima dell'import).
 -- PARAMETERS:  &1 = Schema Name
--- AUTHOR:      ENI DBA Team (Generato tramite Automazione)
+-- AUTHOR:      ACME DBA Team (Generato tramite Automazione)
 -- DATE:        2026-07-12
 -- =========================================================================================
 

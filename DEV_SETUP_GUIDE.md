@@ -57,7 +57,7 @@ Dopo il primo accesso, vai in **Manage Jenkins → Plugins → Available plugins
 
 ## 🔧 STEP 3: Installare Oracle Database
 
-In aziende come ENI il parco database è misto: **Oracle 19c** (la versione Long Term Support
+In aziende come ACME il parco database è misto: **Oracle 19c** (la versione Long Term Support
 più diffusa in produzione) e **Oracle 23ai** (la versione più recente). Per testare la pipeline
 su entrambe le versioni, installa almeno una delle due — idealmente entrambe.
 
@@ -78,9 +78,9 @@ Oracle 23ai Free è la versione gratuita più recente:
    # Se vedi "Connected to: Oracle Database 23ai Free" → funziona!
    ```
 
-### Opzione B: Oracle 19c XE (Express Edition) ⭐ Fondamentale per compatibilità ENI
+### Opzione B: Oracle 19c XE (Express Edition) ⭐ Fondamentale per compatibilità ACME
 
-Oracle 19c è la versione che troverai sui database PROD di ENI. Testare anche su 19c
+Oracle 19c è la versione che troverai sui database PROD di ACME. Testare anche su 19c
 ti garantisce che la pipeline non usi feature disponibili solo su 23ai.
 
 **Installazione diretta su Windows:**
@@ -238,7 +238,7 @@ BEGIN
         INSERT INTO employees VALUES (
             i,
             'Employee_' || i,
-            'emp' || i || '@eni.com',
+            'emp' || i || '@acme.com',
             ROUND(DBMS_RANDOM.VALUE(30000, 120000), 2),
             CASE MOD(i, 4)
                 WHEN 0 THEN 'IT'
@@ -306,9 +306,9 @@ Vai su **Manage Jenkins → Credentials → System → Global credentials → Ad
 
 | ID Credenziale | Tipo | Username | Password |
 |---|---|---|---|
-| `eni-src-db-credentials` | Username with password | `test_source` | `TestPass123` |
-| `eni-tgt-db-credentials` | Username with password | `test_target` | `TestPass123` |
-| `eni-admin-db-credentials` | Username with password | `sys` | `TuaPassword` |
+| `acme-src-db-credentials` | Username with password | `test_source` | `TestPass123` |
+| `acme-tgt-db-credentials` | Username with password | `test_target` | `TestPass123` |
+| `acme-admin-db-credentials` | Username with password | `sys` | `TuaPassword` |
 
 ### B. Creare un file databases.yaml locale per il test
 Crea `config/databases_local.yaml` (non committare!):
@@ -321,7 +321,7 @@ databases:
     host: localhost
     port: 1521
     service_name: FREEPDB1
-    credential_id: eni-src-db-credentials
+    credential_id: acme-src-db-credentials
     data_pump_dir: DATA_PUMP_DIR
     data_pump_path: "C:\\oracle\\datapump"
     schemas_allowed: []
@@ -332,7 +332,7 @@ databases:
     host: localhost
     port: 1521
     service_name: FREEPDB1
-    credential_id: eni-tgt-db-credentials
+    credential_id: acme-tgt-db-credentials
     data_pump_dir: DATA_PUMP_DIR
     data_pump_path: "C:\\oracle\\datapump"
     schemas_allowed: []
@@ -343,7 +343,7 @@ databases:
 2. Nella sezione Pipeline:
    - Definition: **Pipeline script from SCM**
    - SCM: **Git**
-   - Repository URL: il percorso del tuo repo locale (`C:\DBA\eni-oracle-datapump-pipeline`)
+   - Repository URL: il percorso del tuo repo locale (`C:\DBA\acme-oracle-datapump-pipeline`)
    - Branch: `*/master`
 3. Salva
 
@@ -358,9 +358,9 @@ Una volta che il Health Check funziona, prova con `EXPORT` e poi con `IMPORT`.
 
 ---
 
-## ☁️ STEP 8: Usare Oracle Cloud Free Tier con Autonomous DB (Come in ENI!)
+## ☁️ STEP 8: Usare Oracle Cloud Free Tier con Autonomous DB (Come in ACME!)
 
-Dato che ENI usa **Autonomous Database** in produzione, il test più realistico è usare
+Dato che ACME usa **Autonomous Database** in produzione, il test più realistico è usare
 il tuo account **Oracle Cloud Free Tier** (Always Free). Avrai un Autonomous DB vero,
 con `DBMS_DATAPUMP`, Object Storage bucket e OCI CLI — esattamente come in produzione.
 
@@ -494,7 +494,7 @@ EXIT;
 
 ### G. Test Manuale di DBMS_DATAPUMP sull'Autonomous DB
 
-Questo è il test più importante perché replica esattamente il flusso ENI:
+Questo è il test più importante perché replica esattamente il flusso ACME:
 
 ```sql
 sqlplus admin/WelcomeTest#2026@testdevatp_high
@@ -547,8 +547,8 @@ Aggiungi queste credenziali in Jenkins (**Manage Jenkins → Credentials**):
 
 | ID Credenziale | Tipo | Valore |
 |---|---|---|
-| `eni-dev-atp-creds` | Username with password | `admin` / `WelcomeTest#2026` |
-| `eni-dev-atp-wallet` | Secret file | Il file `Wallet_TestDevATP.zip` |
+| `acme-dev-atp-creds` | Username with password | `admin` / `WelcomeTest#2026` |
+| `acme-dev-atp-wallet` | Secret file | Il file `Wallet_TestDevATP.zip` |
 | `oci-config-file` | Secret file | Il file `~/.oci/config` |
 | `oci-api-key` | Secret file | Il file `~/.oci/oci_api_key.pem` |
 
@@ -563,8 +563,8 @@ databases:
     description: "Cloud Free Tier — Autonomous ATP per test"
     environment: DEV
     service_name: testdevatp_high
-    wallet_credential_id: eni-dev-atp-wallet
-    db_credential_id: eni-dev-atp-creds
+    wallet_credential_id: acme-dev-atp-wallet
+    db_credential_id: acme-dev-atp-creds
     oci_region: eu-milan-1                            # La tua regione
     compartment_id: "ocid1.compartment.oc1..tuo_id"   # Dal tuo OCI Console
     adb_ocid: "ocid1.autonomousdatabase.oc1..tuo_id"  # Dal tuo OCI Console
@@ -577,7 +577,7 @@ databases:
 
 ### I. Test Finale della Pipeline Completa
 
-Ora puoi testare il flusso reale ENI su Jenkins:
+Ora puoi testare il flusso reale ACME su Jenkins:
 
 1. **HEALTH_CHECK** su `CLOUD_ATP_DEV` → Verifica connessione al cloud
 2. **EXPORT** da `CLOUD_ATP_DEV`, schema `TEST_SOURCE` → Usa DBMS_DATAPUMP via PL/SQL
@@ -605,7 +605,7 @@ Ora puoi testare il flusso reale ENI su Jenkins:
 3. ✅ `IMPORT` su `LOCAL_TARGET` con remap (usa `impdp` CLI)
 4. ✅ `TABLE_EXPORT` — Solo tabella `EMPLOYEES`
 
-### Fase 2: Cloud (Autonomous / PL/SQL path — come ENI!)
+### Fase 2: Cloud (Autonomous / PL/SQL path — come ACME!)
 5. ✅ `HEALTH_CHECK` su `CLOUD_ATP_DEV`
 6. ✅ `EXPORT` da `CLOUD_ATP_DEV` (usa `DBMS_DATAPUMP` via PL/SQL)
 7. ✅ `IMPORT` su `CLOUD_ATP_DEV` con remap

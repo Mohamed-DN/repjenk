@@ -8,7 +8,7 @@
 --              &4 = oci_fingerprint
 --              &5 = oci_private_key_path (path to PEM key file on local system,
 --                    or paste the key content directly)
--- Author:      ENI DBA Team
+-- Author:      ACME DBA Team
 -- Date:        2026-07-12
 -- Platform:    Oracle Autonomous DB (ATP/ADW) ONLY
 -- Notes:       Questo script funziona SOLO su Autonomous Database.
@@ -33,7 +33,7 @@ DEFINE oci_private_key = &5
 
 PROMPT
 PROMPT ============================================================================
-PROMPT   ENI DATA PUMP PIPELINE - OCI CREDENTIAL SETUP (Autonomous DB)
+PROMPT   ACME DATA PUMP PIPELINE - OCI CREDENTIAL SETUP (Autonomous DB)
 PROMPT   Credential Name: &cred_name
 PROMPT ============================================================================
 PROMPT

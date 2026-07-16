@@ -1,7 +1,7 @@
 #!/usr/bin/env groovy
 // =============================================================================
 // oracleDataPump.groovy — Libreria condivisa Jenkins per Oracle Data Pump
-// ENI S.p.A. — Automazione Database Oracle su OCI
+// ACME S.p.A. — Automazione Database Oracle su OCI
 // =============================================================================
 // Operazioni principali: Export/Import schema e tabelle via CLI (expdp/impdp)
 // per database DBCS e via PL/SQL (DBMS_DATAPUMP) per Autonomous Database.
@@ -222,7 +222,7 @@ BEGIN
     DBMS_DATAPUMP.ADD_FILE(
         handle    => v_handle,
         filename  => '${dumpFilename.replace("'", "''")}',
-        directory => '${options.bucketName ? "DATA_PUMP_DIR" : "DATA_PUMP_DIR"}',
+        directory => 'DATA_PUMP_DIR',  -- TODO P2: export diretto su Object Storage via URI + credential
         filetype  => DBMS_DATAPUMP.KU\$_FILE_TYPE_DUMP_FILE
     );
 
@@ -681,7 +681,6 @@ EXIT;
     -- Rinomina nuova tabella al nome originale
     BEGIN
         EXECUTE IMMEDIATE 'ALTER TABLE ${newSchema.replace("'", "''")}.${table.replace("'", "''")} RENAME TO ${table.replace("'", "''")}';
-        EXECUTE IMMEDIATE 'ALTER TABLE ${schema.replace("'", "''")}.${table.replace("'", "''")} RENAME TO ${schema.replace("'", "''")}.${table.replace("'", "''")}'; -- placeholder
     EXCEPTION WHEN OTHERS THEN
         IF SQLCODE != -942 THEN RAISE; END IF;
     END;
@@ -872,6 +871,407 @@ def generateDumpFilename(String schema, String operation) {
     def filename = "${operation}_${schema}_${timestamp}.dmp"
     echo "[DataPump] Nome dump generato: ${filename}"
     return filename
+}
+
+// ==========================================================================
+// FACADE LAYER — funzioni richiamate direttamente dal Jenkinsfile
+// Delegano a oracleConnect / ociStorage / notifyResult mantenendo
+// un'unica interfaccia verso la pipeline.
+// Convenzione: tutte accettano una Map di argomenti nominati contenente
+// almeno { dbType, credentialId, [walletCredentialId], host/port/serviceName
+// oppure tnsAlias/connectionString }.
+// ==========================================================================
+
+// --------------------------------------------------------------------------
+// Costruzione dbConfig normalizzato a partire dagli argomenti della facade
+// --------------------------------------------------------------------------
+private Map toDbConfig(Map args) {
+    return [
+        dbType:             args.dbType,
+        host:               args.host,
+        port:               args.port,
+        serviceName:        args.serviceName,
+        tnsAlias:           args.tnsAlias ?: args.connectString ?: args.connectionString,
+        connectionString:   args.connectString ?: args.connectionString,
+        credentialId:       args.credentialId,
+        walletCredentialId: args.walletCredentialId,
+        dbName:             args.dbName
+    ]
+}
+
+// --------------------------------------------------------------------------
+// Test di connettività: verifica raggiungibilità e recupera la versione DB
+// Ritorna: [success: bool, version: String, error: String]
+// --------------------------------------------------------------------------
+def testConnectivity(Map args) {
+    def dbConfig = toDbConfig(args)
+    try {
+        def sql = """
+SET PAGESIZE 0 FEEDBACK OFF HEADING OFF
+SELECT version_full FROM product_component_version WHERE ROWNUM = 1;
+EXIT;
+"""
+        def output = oracleConnect.runSqlStatement(dbConfig, sql)
+        def version = output?.readLines()?.collect { it.trim() }?.find { it ==~ /^\d+(\.\d+)+$/ }
+        if (version) {
+            return [success: true, version: version]
+        }
+        return [success: false, error: "Risposta inattesa dal database: ${output?.take(200)}"]
+    } catch (Exception e) {
+        return [success: false, error: e.message]
+    }
+}
+
+// --------------------------------------------------------------------------
+// Spazio disponibile: filesystem locale (dumpDir) e/o tablespace target
+// Ritorna: [freeSpaceGB: Double, fsFreeSpaceGB: Double]
+// --------------------------------------------------------------------------
+def checkAvailableSpace(Map args) {
+    def result = [freeSpaceGB: 0.0d, fsFreeSpaceGB: null]
+
+    // Spazio nel tablespace di default (lato database)
+    def tablespace = args.tablespace ?: 'USERS'
+    try {
+        def spaceMb = oracleConnect.getAvailableSpace(toDbConfig(args), tablespace)
+        result.freeSpaceGB = ((spaceMb ?: 0.0d) / 1024).toDouble().round(2)
+    } catch (Exception e) {
+        echo "[DataPump/Space] ⚠ Impossibile leggere lo spazio del tablespace '${tablespace}': ${e.message}"
+    }
+
+    // Spazio sul filesystem dell'agent (solo se richiesto: dumpDir valorizzato)
+    if (args.dumpDir) {
+        try {
+            def fsGb = sh(
+                script: "df -P --block-size=1G '${args.dumpDir}' | awk 'NR==2 {print \$4}'",
+                returnStdout: true
+            ).trim()
+            result.fsFreeSpaceGB = fsGb ? fsGb.toDouble() : null
+            echo "[DataPump/Space] Filesystem '${args.dumpDir}': ${result.fsFreeSpaceGB} GB liberi"
+        } catch (Exception e) {
+            echo "[DataPump/Space] ⚠ Impossibile leggere lo spazio filesystem: ${e.message}"
+        }
+    }
+    return result
+}
+
+// --------------------------------------------------------------------------
+// Analisi schema: dimensione, numero tabelle/oggetti e stima dump
+// Ritorna: [sizeGB, tableCount, objectCount, estimatedDumpSizeGB]
+// --------------------------------------------------------------------------
+def analyzeSchema(Map args) {
+    assert args.schemaName?.trim() : "schemaName è obbligatorio per analyzeSchema"
+    def dbConfig = toDbConfig(args)
+    def schema = args.schemaName.trim()
+
+    def sizeMb = oracleConnect.getSchemaSize(dbConfig, schema)
+    def stats  = oracleConnect.getSchemaStats(dbConfig, schema)
+
+    def objCount = 0
+    try {
+        def output = oracleConnect.runSqlStatement(dbConfig, """
+SET PAGESIZE 0 FEEDBACK OFF HEADING OFF
+SELECT COUNT(*) FROM all_objects WHERE owner = UPPER('${schema}');
+EXIT;
+""")
+        objCount = output?.readLines()?.collect { it.trim() }?.find { it.isInteger() }?.toInteger() ?: 0
+    } catch (Exception e) {
+        echo "[DataPump/Analyze] ⚠ Conteggio oggetti non disponibile: ${e.message}"
+    }
+
+    def sizeGb = ((sizeMb ?: 0.0d) / 1024).toDouble().round(2)
+
+    // Stima dump: i dati pesano ~80% dei segmenti (indici esclusi dal dump),
+    // poi si applica il fattore di compressione richiesto.
+    def contentFactor = (args.content == 'METADATA_ONLY') ? 0.05d : 0.8d
+    def compressionFactor
+    switch (args.compression ?: 'NONE') {
+        case 'ALL':   compressionFactor = 0.25d; break
+        case 'BASIC': compressionFactor = 0.5d;  break
+        default:      compressionFactor = 1.0d
+    }
+    def estimated = (sizeGb * contentFactor * compressionFactor).toDouble().round(2)
+
+    return [
+        sizeGB:              sizeGb,
+        tableCount:          stats.tableCount ?: 0,
+        objectCount:         objCount,
+        estimatedDumpSizeGB: estimated,
+        totalRows:           stats.totalRows ?: 0L
+    ]
+}
+
+// --------------------------------------------------------------------------
+// Audit log — delega a notifyResult.auditLog
+// --------------------------------------------------------------------------
+def writeAuditLog(Map args) {
+    try {
+        notifyResult.auditLog([
+            operation: args.operation,
+            schema:    args.schema,
+            dbName:    args.sourceDb,
+            targetDb:  args.targetDb,
+            status:    'STARTED',
+            user:      args.user,
+            buildUrl:  args.buildUrl
+        ])
+    } catch (Exception e) {
+        echo "[DataPump/Audit] ⚠ Scrittura audit log fallita (non bloccante): ${e.message}"
+    }
+}
+
+// --------------------------------------------------------------------------
+// Log di simulazione DRY RUN — nessuna operazione eseguita
+// --------------------------------------------------------------------------
+def logDryRun(String operation, Map details = [:]) {
+    def lines = details.collect { k, v -> "  - ${k}: ${v ?: 'N/A'}" }.join('\n')
+    echo """
+[DRY RUN] Operazione simulata: ${operation}
+${lines}
+[DRY RUN] Nessuna modifica è stata applicata ai database."""
+}
+
+// --------------------------------------------------------------------------
+// Upload dump su OCI Object Storage — delega a ociStorage
+// Per Autonomous DB il filesystem non è accessibile: usare export diretto
+// su bucket (DBMS_CLOUD) — qui viene emesso solo un warning.
+// --------------------------------------------------------------------------
+def uploadToBucket(Map args) {
+    if ((args.dbType ?: '').toLowerCase() in ['autonomous', 'adb']) {
+        echo "[DataPump/Bucket] ⚠ Il database è Autonomous: il dump risiede in DATA_PUMP_DIR lato DB. " +
+             "Usare DBMS_CLOUD.PUT_OBJECT o l'export diretto su Object Storage. Upload dall'agent saltato."
+        return [status: 'SKIPPED', reason: 'autonomous-db']
+    }
+    def ns = ociStorage.getNamespace()
+    return ociStorage.uploadToBucket(ns, args.bucketName, args.objectName, args.sourceFile)
+}
+
+// --------------------------------------------------------------------------
+// Download dump da OCI Object Storage — delega a ociStorage
+// --------------------------------------------------------------------------
+def downloadFromBucket(Map args) {
+    if ((args.dbType ?: '').toLowerCase() in ['autonomous', 'adb']) {
+        echo "[DataPump/Bucket] ⚠ Il database è Autonomous: usare DBMS_CLOUD.GET_OBJECT o import diretto " +
+             "da Object Storage. Download sull'agent saltato."
+        return [status: 'SKIPPED', reason: 'autonomous-db']
+    }
+    def ns = ociStorage.getNamespace()
+    return ociStorage.downloadFromBucket(ns, args.bucketName, args.objectName, args.targetFile)
+}
+
+// --------------------------------------------------------------------------
+// Validazione schema: esistenza, conteggio oggetti/tabelle, oggetti INVALID
+// Ritorna: [valid, objectCount, tableCount, invalidCount, errors]
+// --------------------------------------------------------------------------
+def validateSchema(Map args) {
+    assert args.schemaName?.trim() : "schemaName è obbligatorio per validateSchema"
+    def dbConfig = toDbConfig(args)
+    def schema = args.schemaName.trim()
+    def result = [valid: false, objectCount: 0, tableCount: 0, invalidCount: 0, errors: []]
+
+    if (!oracleConnect.schemaExists(dbConfig, schema)) {
+        result.errors << "Lo schema '${schema}' non esiste sul database"
+        return result
+    }
+
+    def output = oracleConnect.runSqlStatement(dbConfig, """
+SET PAGESIZE 0 FEEDBACK OFF HEADING OFF
+SELECT 'OBJ=' || COUNT(*) ||
+       '|TAB=' || SUM(CASE WHEN object_type = 'TABLE' THEN 1 ELSE 0 END) ||
+       '|INV=' || SUM(CASE WHEN status = 'INVALID' THEN 1 ELSE 0 END)
+FROM all_objects WHERE owner = UPPER('${schema}');
+EXIT;
+""")
+    def line = output?.readLines()?.collect { it.trim() }?.find { it.startsWith('OBJ=') }
+    if (line) {
+        line.split('\\|').each { part ->
+            def kv = part.split('=')
+            if (kv.length == 2 && kv[1].isInteger()) {
+                switch (kv[0]) {
+                    case 'OBJ': result.objectCount  = kv[1].toInteger(); break
+                    case 'TAB': result.tableCount   = kv[1].toInteger(); break
+                    case 'INV': result.invalidCount = kv[1].toInteger(); break
+                }
+            }
+        }
+    }
+
+    if (result.objectCount == 0) {
+        result.errors << "Lo schema '${schema}' esiste ma è vuoto (0 oggetti)"
+    }
+    if (result.invalidCount > 0) {
+        echo "[DataPump/Validate] ⚠ ${result.invalidCount} oggetti INVALID in '${schema}' (non bloccante)"
+    }
+    result.valid = result.errors.isEmpty()
+    return result
+}
+
+// --------------------------------------------------------------------------
+// Rename schema — LIMITAZIONE ORACLE: non esiste un rename nativo di schema.
+// Questa funzione fallisce con istruzioni operative. Per lo swap zero-copy
+// usare TABLE_EXISTS_ACTION=SAFE_SWAP (rename table-level nello stesso
+// schema) oppure REMAP_SCHEMA in fase di import.
+// --------------------------------------------------------------------------
+def renameSchema(Map args) {
+    error """[DataPump/Swap] Oracle non supporta il rename di uno schema (${args.oldName} → ${args.newName}).
+Alternative supportate dalla pipeline:
+  1. TABLE_EXISTS_ACTION=SAFE_SWAP  → import su tabelle _JENK + swap atomico table-level (stesso schema)
+  2. REMAP_SCHEMA in fase di import → importa direttamente nello schema di destinazione
+  3. Repoint dei sinonimi applicativi verso lo schema nuovo (operazione manuale/applicativa)"""
+}
+
+// --------------------------------------------------------------------------
+// Drop schema (DROP USER CASCADE) con guardia di sicurezza:
+// consentito solo su schemi con suffisso _BKP/_NEW/_OLD, salvo force=true
+// --------------------------------------------------------------------------
+def dropSchema(Map args) {
+    assert args.schemaName?.trim() : "schemaName è obbligatorio per dropSchema"
+    def schema = args.schemaName.trim().toUpperCase()
+
+    def allowedSuffixes = ['_BKP', '_NEW', '_OLD', '_JENK']
+    def isSafe = allowedSuffixes.any { schema.contains(it) }
+    if (!isSafe && !args.force) {
+        error "[DataPump/Drop] Rifiutato il drop dello schema '${schema}': " +
+              "consentito solo su schemi ${allowedSuffixes.join('/')} (oppure passare force: true)."
+    }
+
+    echo "[DataPump/Drop] Eliminazione schema '${schema}'..."
+    oracleConnect.runSqlStatement(toDbConfig(args), """
+WHENEVER SQLERROR EXIT SQL.SQLCODE
+DROP USER "${schema}" CASCADE;
+""")
+    echo "[DataPump/Drop] ✔ Schema '${schema}' eliminato"
+    return [status: 'SUCCESS', schema: schema]
+}
+
+// --------------------------------------------------------------------------
+// Rollback swap — best effort: riporta lo stato degli schemi coinvolti
+// per guidare l'intervento manuale (lo swap schema-level non è supportato,
+// quindi non c'è nulla di parziale da annullare a livello schema).
+// --------------------------------------------------------------------------
+def rollbackSwap(Map args) {
+    def dbConfig = toDbConfig(args)
+    def schema = args.schemaName?.trim()
+    def report = [:]
+    ['': schema, '_BKP': "${schema}_BKP", '_NEW': "${schema}_NEW"].each { suffix, name ->
+        try {
+            report[name] = oracleConnect.schemaExists(dbConfig, name) ? 'PRESENTE' : 'ASSENTE'
+        } catch (Exception e) {
+            report[name] = "ERRORE: ${e.message}"
+        }
+    }
+    echo "[DataPump/Rollback] Stato schemi dopo il fallimento dello swap:"
+    report.each { name, state -> echo "  - ${name}: ${state}" }
+    return report
+}
+
+// --------------------------------------------------------------------------
+// Conteggio record per tabella.
+// - Con tableList: COUNT(*) esatto sulle tabelle indicate
+// - Senza tableList: num_rows dalle statistiche (veloce, adatto a schemi TB)
+// Ritorna: Map [TABLE_NAME: rowCount]
+// --------------------------------------------------------------------------
+def getRecordCounts(Map args) {
+    assert args.schemaName?.trim() : "schemaName è obbligatorio per getRecordCounts"
+    def dbConfig = toDbConfig(args)
+    def schema = args.schemaName.trim()
+    def counts = [:]
+
+    def tableList = args.tableList instanceof String ?
+        args.tableList.split(',').collect { it.trim() }.findAll { it } :
+        (args.tableList ?: [])
+
+    if (tableList) {
+        // COUNT(*) esatto solo sulle tabelle richieste
+        def unionSql = tableList.collect { t ->
+            "SELECT '${t.toUpperCase()}' || '|' || COUNT(*) FROM \"${schema.toUpperCase()}\".\"${t.toUpperCase()}\""
+        }.join('\nUNION ALL\n')
+        def output = oracleConnect.runSqlStatement(dbConfig, """
+SET PAGESIZE 0 FEEDBACK OFF HEADING OFF LINESIZE 300
+${unionSql};
+EXIT;
+""")
+        output?.readLines()?.each { line ->
+            def parts = line.trim().split('\\|')
+            if (parts.length == 2 && parts[1].isLong()) counts[parts[0]] = parts[1].toLong()
+        }
+    } else {
+        // num_rows dalle statistiche — richiede statistiche aggiornate
+        def stats = oracleConnect.getSchemaStats(dbConfig, schema)
+        counts = stats.tables ?: [:]
+    }
+    return counts
+}
+
+// --------------------------------------------------------------------------
+// Conteggio oggetti per tipo — Map [OBJECT_TYPE: count]
+// --------------------------------------------------------------------------
+def getObjectCounts(Map args) {
+    assert args.schemaName?.trim() : "schemaName è obbligatorio per getObjectCounts"
+    def output = oracleConnect.runSqlStatement(toDbConfig(args), """
+SET PAGESIZE 0 FEEDBACK OFF HEADING OFF LINESIZE 300
+SELECT object_type || '|' || COUNT(*)
+FROM all_objects
+WHERE owner = UPPER('${args.schemaName.trim()}')
+GROUP BY object_type ORDER BY object_type;
+EXIT;
+""")
+    def counts = [:]
+    output?.readLines()?.each { line ->
+        def parts = line.trim().split('\\|')
+        if (parts.length == 2 && parts[1].isInteger()) counts[parts[0]] = parts[1].toInteger()
+    }
+    return counts
+}
+
+// --------------------------------------------------------------------------
+// Generazione report HTML dell'operazione a partire dalla Map reportData
+// --------------------------------------------------------------------------
+def generateHtmlReport(Map reportData) {
+    def rows = new StringBuilder()
+    reportData.each { k, v ->
+        def label = k.replaceAll(/([A-Z])/, ' $1').capitalize()
+        rows.append("      <tr><td class=\"k\">${label}</td><td>${v ?: 'N/A'}</td></tr>\n")
+    }
+    def ignoredWarnings = env.IGNORED_ORA_WARNINGS ?
+        "<h2>⚠ Errori Oracle ignorati (whitelist)</h2><pre>${env.IGNORED_ORA_WARNINGS}</pre>" : ''
+
+    return """<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<title>ACME Data Pump Report — ${reportData.operation ?: 'N/A'} #${reportData.buildNumber ?: ''}</title>
+<style>
+  body { font-family: 'Segoe UI', Arial, sans-serif; background: #f5f5f5; color: #333; margin: 0; }
+  .container { max-width: 820px; margin: 24px auto; background: #fff; border-radius: 8px;
+               box-shadow: 0 2px 8px rgba(0,0,0,.1); overflow: hidden; }
+  .header { background: #009A3D; color: #fff; padding: 24px 30px; }
+  .header h1 { margin: 0; font-size: 22px; }
+  .header p { margin: 6px 0 0; opacity: .85; font-size: 13px; }
+  .section { padding: 10px 30px 30px; }
+  h2 { color: #009A3D; border-bottom: 2px solid #FFD800; padding-bottom: 6px; font-size: 16px; }
+  table { width: 100%; border-collapse: collapse; }
+  td { padding: 8px 12px; border-bottom: 1px solid #e8e8e8; font-size: 14px; }
+  td.k { font-weight: 600; color: #006B2B; width: 240px; }
+  tr:nth-child(even) { background: #fafafa; }
+  pre { background: #f8f9fa; border: 1px solid #ddd; padding: 12px; font-size: 12px; overflow-x: auto; }
+</style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>ACME Oracle Data Pump — Report Operazione</h1>
+      <p>Build #${reportData.buildNumber ?: 'N/A'} — ${reportData.timestamp ?: ''}</p>
+    </div>
+    <div class="section">
+      <h2>Dettagli operazione</h2>
+      <table>
+${rows}
+      </table>
+      ${ignoredWarnings}
+    </div>
+  </div>
+</body>
+</html>"""
 }
 
 // --------------------------------------------------------------------------

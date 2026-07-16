@@ -3,7 +3,7 @@
 -- Purpose:     Verifica post-importazione: oggetti, righe, vincoli, indici
 --              Post-import verification report for imported schema
 -- Parameters:  &1 = schema_name
--- Author:      ENI DBA Team
+-- Author:      ACME DBA Team
 -- Date:        2026-07-12
 -- Platform:    Oracle Autonomous DB (ATP/ADW) / DBCS / On-Premises
 --------------------------------------------------------------------------------
@@ -22,7 +22,7 @@ DEFINE schema_name = &1
 
 PROMPT
 PROMPT ============================================================================
-PROMPT   ENI DATA PUMP PIPELINE - POST-IMPORT VERIFICATION REPORT
+PROMPT   ACME DATA PUMP PIPELINE - POST-IMPORT VERIFICATION REPORT
 PROMPT   Schema: &schema_name
 PROMPT ============================================================================
 PROMPT

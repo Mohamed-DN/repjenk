@@ -1,7 +1,7 @@
 #!/bin/bash
 ###############################################################################
 # health_check.sh — Controllo salute pre-pipeline
-# Progetto: ENI Oracle Data Pump Automation Pipeline
+# Progetto: ACME Oracle Data Pump Automation Pipeline
 #
 # Utilizzo:
 #   health_check.sh [connect_string]
@@ -560,7 +560,7 @@ check_utilities() {
 print_report() {
     echo ""
     echo -e "${BOLD}╔══════════════════════════════════════════════════════════════╗${NC}"
-    echo -e "${BOLD}║          ENI Data Pump Pipeline — Health Check Report       ║${NC}"
+    echo -e "${BOLD}║          ACME Data Pump Pipeline — Health Check Report       ║${NC}"
     echo -e "${BOLD}║          $(date '+%Y-%m-%d %H:%M:%S')                                  ║${NC}"
     echo -e "${BOLD}╠══════════════════════════════════════════════════════════════╣${NC}"
 
@@ -598,7 +598,7 @@ main() {
 
     echo -e "${BOLD}"
     echo "╔══════════════════════════════════════════════════════════════╗"
-    echo "║     ENI Oracle Data Pump Pipeline — Health Check           ║"
+    echo "║     ACME Oracle Data Pump Pipeline — Health Check           ║"
     echo "║     Avvio: $(date '+%Y-%m-%d %H:%M:%S')                              ║"
     echo "╚══════════════════════════════════════════════════════════════╝"
     echo -e "${NC}"

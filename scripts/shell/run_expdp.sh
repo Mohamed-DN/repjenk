@@ -1,7 +1,7 @@
 #!/bin/bash
 ###############################################################################
 # run_expdp.sh — Wrapper per Oracle Data Pump Export (expdp)
-# Progetto: ENI Oracle Data Pump Automation Pipeline
+# Progetto: ACME Oracle Data Pump Automation Pipeline
 # Ambiente: DBCS / VM (NON Autonomous Database)
 #
 # Utilizzo:
@@ -191,7 +191,7 @@ fi
 # Verifica prerequisiti
 # ===========================================================================
 log_info "============================================================"
-log_info " ENI Data Pump Export — Avvio"
+log_info " ACME Data Pump Export — Avvio"
 log_info " Schema: ${SCHEMA}"
 log_info " Dump Dir: ${DUMP_DIR}"
 log_info " Dump File: ${DUMP_FILE}"
@@ -319,7 +319,7 @@ build_expdp_command() {
     fi
 
     # Job name univoco
-    local job_name="ENI_EXP_${SCHEMA}_${TIMESTAMP}"
+    local job_name="ACME_EXP_${SCHEMA}_${TIMESTAMP}"
     # Tronca a 30 caratteri (limite Oracle)
     job_name="${job_name:0:30}"
     cmd_args+=("JOB_NAME=${job_name}")
@@ -336,13 +336,13 @@ build_expdp_command() {
 # ===========================================================================
 generate_parfile() {
     local parfile_dir="/tmp"
-    PARFILE_PATH="${parfile_dir}/eni_expdp_${SCHEMA}_${TIMESTAMP}.par"
+    PARFILE_PATH="${parfile_dir}/acme_expdp_${SCHEMA}_${TIMESTAMP}.par"
 
     log_info "Generazione parfile: ${PARFILE_PATH}"
 
     cat > "${PARFILE_PATH}" <<PAREOF
 # =============================================================================
-# ENI Data Pump Export — Parfile generato automaticamente
+# ACME Data Pump Export — Parfile generato automaticamente
 # Schema: ${SCHEMA}
 # Data: $(date '+%Y-%m-%d %H:%M:%S')
 # =============================================================================
@@ -387,7 +387,7 @@ PAREOF
     [[ -n "${QUERY_FILTER:-}" ]]   && echo "QUERY=${SCHEMA}:\"${QUERY_FILTER}\"" >> "${PARFILE_PATH}"
     [[ -n "${FLASHBACK_TIME:-}" ]] && echo "FLASHBACK_TIME=\"${FLASHBACK_TIME}\"" >> "${PARFILE_PATH}"
 
-    local job_name="ENI_EXP_${SCHEMA}_${TIMESTAMP}"
+    local job_name="ACME_EXP_${SCHEMA}_${TIMESTAMP}"
     echo "JOB_NAME=${job_name:0:30}" >> "${PARFILE_PATH}"
     echo "METRICS=YES" >> "${PARFILE_PATH}"
     echo "REUSE_DUMPFILES=YES" >> "${PARFILE_PATH}"
