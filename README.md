@@ -1186,9 +1186,9 @@ gitGraph
 
 | Ruolo | Contatto |
 |---|---|
-| Team DBA Oracle | `dba-oracle@m-dn.com` |
-| Pipeline Owner | `dba-automation@m-dn.com` |
-| Supporto Infrastruttura | `oci-support@m-dn.com` |
+| Team DBA Oracle | `dba_m-dn` |
+| Pipeline Owner | `dba_m-dn` |
+| Supporto Infrastruttura | `oci_m-dn` |
 | Canale Teams | `#dba-datapump-pipeline` |
 
 ---
